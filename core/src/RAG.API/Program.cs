@@ -1,7 +1,14 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
+using Minio;
+using RAG.API.Authentication;
+using RAG.API.Filters;
+using RAG.API.Middleware;
+using RAG.Application.Interfaces;
 using RAG.Application.Services;
 using RAG.Core.Configuration;
 using RAG.Infrastructure.Services;
+using RAG.Infrastructure.Storage;
 using Serilog;
 using Serilog.Events;
 
@@ -52,11 +59,101 @@ try
         builder.Configuration.GetSection("Ollama"));
     builder.Services.Configure<KeycloakSettings>(
         builder.Configuration.GetSection("Keycloak"));
+    builder.Services.Configure<MinIOSettings>(
+        builder.Configuration.GetSection("MinIO"));
+
+    // Configure authentication
+    if (builder.Environment.IsDevelopment())
+    {
+        // Use test authentication in development
+        builder.Services.AddAuthentication("TestScheme")
+            .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
+                "TestScheme",
+                options => { });
+
+        builder.Services.AddAuthorization();
+
+        Log.Warning("Using TEST AUTHENTICATION - DO NOT USE IN PRODUCTION");
+        Log.Information("Test Token: {TestToken}", TestAuthenticationHandler.TestToken);
+    }
+    else
+    {
+        // TODO: Configure Keycloak JWT authentication for production
+        throw new InvalidOperationException("Production authentication not yet configured. Please configure Keycloak JWT authentication.");
+    }
 
     // Add services to the container.
+    builder.Services.AddControllers();
+
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    builder.Services.AddSwaggerGen(options =>
+    {
+        options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+        {
+            Title = "RAG Architecture API",
+            Version = "v1",
+            Description = "Production-ready RAG framework for professional chatbots"
+        });
+
+        // Add XML comments for better documentation
+        var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        if (File.Exists(xmlPath))
+        {
+            options.IncludeXmlComments(xmlPath);
+        }
+
+        // Add support for file uploads in Swagger UI
+        options.OperationFilter<SwaggerFileOperationFilter>();
+
+        // Add authentication support to Swagger UI
+        options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+        {
+            Name = "Authorization",
+            Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+            Description = "Enter test token: dev-test-token-12345"
+        });
+
+        options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+        {
+            {
+                new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                {
+                    Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                    {
+                        Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+                Array.Empty<string>()
+            }
+        });
+    });
+
+    // Register MinIO SDK client
+    builder.Services.AddSingleton<IMinioClient>(sp =>
+    {
+        var minioSettings = sp.GetRequiredService<IOptions<MinIOSettings>>().Value;
+        return new MinioClient()
+            .WithEndpoint(minioSettings.Endpoint)
+            .WithCredentials(minioSettings.AccessKey, minioSettings.SecretKey)
+            .WithSSL(minioSettings.UseSSL)
+            .Build();
+    });
+
+    // Register MinIO client wrapper
+    builder.Services.AddScoped<IMinIOClient, MinIOClient>();
+
+    // Register application services
+    builder.Services.AddScoped<IFileValidationService, FileValidationService>();
+    builder.Services.AddScoped<ITenantContext, TenantContext>();
+    builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+    builder.Services.AddScoped<IDocumentStorageService, MinIODocumentStorageService>();
+    builder.Services.AddHttpContextAccessor();
 
     // Register health check service
     builder.Services.AddHttpClient();
@@ -73,6 +170,10 @@ try
     Log.Information("Embedding Service URL: {EmbeddingServiceUrl}", appSettings.EmbeddingService.Url);
     Log.Information("OpenAI Model: {OpenAIModel}", appSettings.OpenAI.Model);
     Log.Information("Ollama URL: {OllamaUrl}, Model: {OllamaModel}", appSettings.Ollama.Url, appSettings.Ollama.Model);
+    Log.Information("MinIO Endpoint: {MinIOEndpoint}, Bucket: {MinIOBucket}", appSettings.MinIO.Endpoint, appSettings.MinIO.BucketName);
+
+    // Add exception handling middleware (must be early in pipeline)
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
 
     // Add Serilog request logging
     app.UseSerilogRequestLogging(options =>
@@ -93,61 +194,10 @@ try
         app.UseSwaggerUI();
     }
 
-    app.UseHttpsRedirection();
+    app.UseAuthentication();
+    app.UseAuthorization();
 
-    // Health check endpoints
-    app.MapGet("/healthz", () => Results.Ok("OK"))
-        .WithName("Liveness")
-        .WithOpenApi(operation =>
-        {
-            operation.Summary = "Liveness probe for Kubernetes";
-            operation.Description = "Returns 200 OK if the application is running";
-            return operation;
-        })
-        .Produces(200)
-        .Produces(500);
-
-    app.MapGet("/healthz/live", () => Results.Ok("OK"))
-        .WithName("LivenessAlias")
-        .WithOpenApi(operation =>
-        {
-            operation.Summary = "Liveness probe alias";
-            operation.Description = "Alternative liveness probe endpoint. Returns 200 OK if the application is running";
-            return operation;
-        })
-        .Produces(200)
-        .Produces(500);
-
-    app.MapGet("/healthz/ready", async (IHealthCheckService healthService) =>
-        {
-            var health = await healthService.GetHealthStatusAsync();
-            return health.Status == "Healthy" ? Results.Ok() : Results.StatusCode(503);
-        })
-        .WithName("Readiness")
-        .WithOpenApi(operation =>
-        {
-            operation.Summary = "Readiness probe for Kubernetes";
-            operation.Description = "Returns 200 OK if all services are healthy, 503 Service Unavailable otherwise";
-            return operation;
-        })
-        .Produces(200)
-        .Produces(503);
-
-    app.MapGet("/api/admin/health", async (IHealthCheckService healthService) =>
-        {
-            var health = await healthService.GetHealthStatusAsync();
-            return Results.Ok(health);
-        })
-        .WithName("DetailedHealth")
-        .WithOpenApi(operation =>
-        {
-            operation.Summary = "Detailed health status of all services";
-            operation.Description = "Returns detailed JSON with health status of all RAG system dependencies. Requires authentication in production.";
-            return operation;
-        })
-        .Produces<RAG.Core.Domain.HealthStatus>(200)
-        .Produces(401)
-        .Produces(503);
+    app.MapControllers();
 
     app.Run();
     Log.Information("Application stopped cleanly");
