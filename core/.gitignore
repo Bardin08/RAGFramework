@@ -9,6 +9,9 @@ obj/
 *.pdb
 *.log
 
+# Serilog logs
+logs/
+
 # Build results
 [Dd]ebug/
 [Rr]elease/
@@ -60,6 +63,7 @@ packages/
 
 # Docker
 docker-compose.override.yml
+data/
 
 # Environment
 .env

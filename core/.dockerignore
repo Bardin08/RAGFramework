@@ -1,0 +1,38 @@
+# .NET Build artifacts
+bin/
+obj/
+*.user
+*.suo
+
+# IDE and Editor
+.vs/
+.vscode/
+.idea/
+.cursor/
+.fleet/
+
+# Source control
+.git/
+
+# Logs
+logs/
+*.log
+
+# Data
+data/
+
+# Test results
+TestResults/
+coverage/
+
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
+
+# Documentation (for build context optimization)
+docs/
+source-papers/
+web-bundles/
+chapters/
