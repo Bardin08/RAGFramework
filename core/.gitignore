@@ -1,0 +1,90 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.log
+
+# Serilog logs
+logs/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa]pp_[Dd]ata/
+
+# IDE and Editor
+.vs/
+.vscode/
+.idea/
+.cursor/
+.fleet/
+*.sln.docstates
+*.userprefs
+*.pidb
+*.DotSettings.user
+*.swp
+*.swo
+*~
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# JetBrains
+.idea/
+*.sln.iml
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# Docker
+docker-compose.override.yml
+data/
+
+# Environment
+.env
+.env.local
+
+# AI Assistants and Tools
+.claude/
+.github/
+.bmad/
+.bmad-core/
+*.bmad
+*.bmpr
+
+# Google Drive temp files
+.tmp.driveupload/
+.tmp.drivedownload/
+~$*
+
+# Thesis artifacts and documentation
+*.docx
+*.pdf
+docs/
+source-papers/
+web-bundles/
