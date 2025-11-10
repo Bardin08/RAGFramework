@@ -63,7 +63,7 @@ packages/
 
 # Docker
 docker-compose.override.yml
-data/
+docker-data/
 
 # Environment
 .env

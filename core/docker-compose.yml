@@ -11,7 +11,7 @@ services:
     ports:
       - "9200:9200"
     volumes:
-      - ./data/elasticsearch:/usr/share/elasticsearch/data
+      - ./docker-data/elasticsearch:/usr/share/elasticsearch/data
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 30s
@@ -27,7 +27,7 @@ services:
       - "6333:6333"  # HTTP API
       - "6334:6334"  # gRPC
     volumes:
-      - ./data/qdrant:/qdrant/storage
+      - ./docker-data/qdrant:/qdrant/storage
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:6333/health || exit 1"]
       interval: 30s
@@ -48,7 +48,7 @@ services:
       - "8080:8080"
       - "9000:9000"
     volumes:
-      - ./data/keycloak:/opt/keycloak/data
+      - ./docker-data/keycloak:/opt/keycloak/data
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9000/health/ready || exit 1"]
       interval: 30s
@@ -87,7 +87,7 @@ services:
       - "9090:9000"  # API
       - "9001:9001"  # Console UI
     volumes:
-      - ./data/minio:/data
+      - ./docker-data/minio:/data
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
       interval: 30s
@@ -106,7 +106,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./docker-data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rag_user -d rag_db"]
       interval: 10s

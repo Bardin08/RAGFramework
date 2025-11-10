@@ -1,0 +1,5 @@
+This is a sample text file for testing text extraction.
+It contains multiple lines of text.
+Line 3: Testing special characters: @#$%^&*()
+Line 4: Testing numbers: 1234567890
+End of test file.
