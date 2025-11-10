@@ -23,5 +23,10 @@ public enum DocumentStatus
     /// <summary>
     /// Document processing failed.
     /// </summary>
-    Failed
+    Failed,
+
+    /// <summary>
+    /// Document already exists (duplicate detected via content hash).
+    /// </summary>
+    AlreadyExists
 }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Minio;
 using RAG.API.Authentication;
@@ -7,6 +8,8 @@ using RAG.API.Middleware;
 using RAG.Application.Interfaces;
 using RAG.Application.Services;
 using RAG.Core.Configuration;
+using RAG.Infrastructure.Data;
+using RAG.Infrastructure.Repositories;
 using RAG.Infrastructure.Services;
 using RAG.Infrastructure.Storage;
 using Serilog;
@@ -134,6 +137,9 @@ try
         });
     });
 
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
     // Register MinIO SDK client
     builder.Services.AddSingleton<IMinioClient>(sp =>
     {
@@ -153,6 +159,8 @@ try
     builder.Services.AddScoped<ITenantContext, TenantContext>();
     builder.Services.AddScoped<IFileUploadService, FileUploadService>();
     builder.Services.AddScoped<IDocumentStorageService, MinIODocumentStorageService>();
+    builder.Services.AddSingleton<IHashService, Sha256HashService>();
+    builder.Services.AddScoped<IDocumentHashRepository, DocumentHashRepository>();
     builder.Services.AddHttpContextAccessor();
 
     // Register health check service
