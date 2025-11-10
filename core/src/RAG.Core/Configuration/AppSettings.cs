@@ -36,6 +36,11 @@ public class AppSettings
     /// Gets or sets the Keycloak settings.
     /// </summary>
     public KeycloakSettings Keycloak { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the MinIO settings.
+    /// </summary>
+    public MinIOSettings MinIO { get; set; } = new();
 }
 
 /// <summary>
@@ -137,4 +142,39 @@ public class KeycloakSettings
     /// </summary>
     [Required]
     public string Audience { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Configuration settings for MinIO object storage.
+/// </summary>
+public class MinIOSettings
+{
+    /// <summary>
+    /// Gets or sets the MinIO endpoint (host:port).
+    /// </summary>
+    [Required]
+    public string Endpoint { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the MinIO access key.
+    /// </summary>
+    [Required]
+    public string AccessKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the MinIO secret key.
+    /// </summary>
+    [Required]
+    public string SecretKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the bucket name for document storage.
+    /// </summary>
+    [Required]
+    public string BucketName { get; set; } = "rag-documents";
+
+    /// <summary>
+    /// Gets or sets whether to use SSL for connections.
+    /// </summary>
+    public bool UseSSL { get; set; } = false;
 }
