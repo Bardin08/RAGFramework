@@ -1,0 +1,65 @@
+{{- if .Values.autoscaling.api.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "ragframework.fullname" . }}-{{ .Values.api.name }}
+  labels:
+    {{- include "ragframework.api.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "ragframework.fullname" . }}-{{ .Values.api.name }}
+  minReplicas: {{ .Values.autoscaling.api.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.api.maxReplicas }}
+  metrics:
+    {{- if .Values.autoscaling.api.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.api.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.api.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.api.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
+---
+{{- if .Values.autoscaling.embedding.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "ragframework.fullname" . }}-{{ .Values.embedding.name }}
+  labels:
+    {{- include "ragframework.embedding.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "ragframework.fullname" . }}-{{ .Values.embedding.name }}
+  minReplicas: {{ .Values.autoscaling.embedding.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.embedding.maxReplicas }}
+  metrics:
+    {{- if .Values.autoscaling.embedding.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.embedding.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.embedding.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.embedding.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,418 @@
+# Default values for ragframework
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global settings
+global:
+  # Image tag for all RAG services (API, Embedding, Migrations)
+  # This should be set by your gitops repository
+  # Format: v{major}.{minor}.{patch}-{short-sha} (e.g., v1.2.3-abc1234)
+  imageTag: ""
+
+# Registry configuration
+image:
+  registry: ghcr.io
+  repository: bardin08/ragframework
+  pullPolicy: IfNotPresent
+  # Secrets for pulling private images (managed by gitops)
+  pullSecrets: []
+  # - name: ghcr-credentials
+
+# API Service
+api:
+  name: ragcore-api
+  replicaCount: 2
+
+  image:
+    name: ragcore-api
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /healthz/ready
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    readOnlyRootFilesystem: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  # Environment variables (non-sensitive)
+  env:
+    ASPNETCORE_ENVIRONMENT: "Production"
+    ASPNETCORE_URLS: "http://+:8080"
+
+  # ConfigMap for application settings (managed in gitops for sensitive data)
+  # config: {}
+
+# Embedding Service
+embedding:
+  name: ragcore-embedding
+  replicaCount: 2
+
+  image:
+    name: ragcore-embedding
+
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8001
+    initialDelaySeconds: 60
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8001
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    readOnlyRootFilesystem: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  env:
+    PYTHONUNBUFFERED: "1"
+    MODEL_NAME: "sentence-transformers/all-MiniLM-L6-v2"
+
+# Migrations Job
+migrations:
+  enabled: true  # Set to false for first deployment
+  name: ragcore-migrations
+
+  image:
+    name: ragcore-migrations
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    readOnlyRootFilesystem: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+# PostgreSQL
+postgres:
+  enabled: true
+  name: postgres
+  replicaCount: 1
+
+  image:
+    repository: postgres
+    tag: "16"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 5432
+
+  persistence:
+    enabled: true
+    storageClass: ""  # Use default storage class
+    size: 10Gi
+    accessModes:
+      - ReadWriteOnce
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+  # Database configuration (credentials managed in gitops via secrets)
+  database: rag_db
+  # Secrets reference (managed in gitops)
+  # existingSecret: postgres-credentials
+
+# Valkey (Redis alternative)
+valkey:
+  enabled: true
+  name: valkey
+  replicaCount: 1
+
+  image:
+    repository: valkey/valkey
+    tag: "7.2"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 6379
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 5Gi
+    accessModes:
+      - ReadWriteOnce
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+# Elasticsearch
+elasticsearch:
+  enabled: true
+  name: elasticsearch
+  replicaCount: 1
+
+  image:
+    repository: elasticsearch
+    tag: "8.12.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    httpPort: 9200
+    transportPort: 9300
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 20Gi
+    accessModes:
+      - ReadWriteOnce
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+  env:
+    discovery.type: "single-node"
+    xpack.security.enabled: "false"
+    ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+
+# Qdrant
+qdrant:
+  enabled: true
+  name: qdrant
+  replicaCount: 1
+
+  image:
+    repository: qdrant/qdrant
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    httpPort: 6333
+    grpcPort: 6334
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 10Gi
+    accessModes:
+      - ReadWriteOnce
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+# Keycloak
+keycloak:
+  enabled: true
+  name: keycloak
+  replicaCount: 1
+
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    httpPort: 8080
+    healthPort: 9000
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 5Gi
+    accessModes:
+      - ReadWriteOnce
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+  # Admin credentials (managed in gitops via secrets)
+  # existingSecret: keycloak-credentials
+
+  env:
+    KC_HEALTH_ENABLED: "true"
+
+# MinIO
+minio:
+  enabled: true
+  name: minio
+  replicaCount: 1
+
+  image:
+    repository: minio/minio
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    apiPort: 9000
+    consolePort: 9001
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 50Gi
+    accessModes:
+      - ReadWriteOnce
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  # Credentials (managed in gitops via secrets)
+  # existingSecret: minio-credentials
+
+# Ingress configuration (optional)
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: rag-api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api
+  tls: []
+    # - secretName: rag-api-tls
+    #   hosts:
+    #     - rag-api.example.com
+
+# Horizontal Pod Autoscaler (optional)
+autoscaling:
+  api:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  embedding:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 85
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

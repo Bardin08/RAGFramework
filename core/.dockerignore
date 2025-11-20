@@ -1,8 +1,18 @@
-# .NET Build artifacts
-bin/
-obj/
-*.user
-*.suo
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# GitHub
+.github/
+
+# Documentation
+*.md
+docs/
+source-papers/
+web-bundles/
+chapters/
+README.md
 
 # IDE and Editor
 .vs/
@@ -10,20 +20,55 @@ obj/
 .idea/
 .cursor/
 .fleet/
+*.swp
+*.swo
+*~
 
-# Source control
-.git/
-
-# Logs
-logs/
-*.log
-
-# Data
-data/
+# .NET Build artifacts
+**/bin/
+**/obj/
+**/out/
+**/publish/
+*.user
+*.suo
+*.cache
 
 # Test results
 TestResults/
 coverage/
+*.trx
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Data directories
+data/
+docker-data/
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+**/.pytest_cache/
+**/.mypy_cache/
+**/venv/
+**/.venv/
+
+# Environment
+.env
+.env.*
+*.local
+
+# Helm (not needed in Docker context)
+helm/
+
+# Logs
+logs/
+*.log
 
 # Dependencies
 node_modules/
@@ -31,8 +76,9 @@ node_modules/
 # macOS
 .DS_Store
 
-# Documentation (for build context optimization)
-docs/
-source-papers/
-web-bundles/
-chapters/
+# Windows
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
