@@ -1,0 +1,71 @@
+{{- if .Values.valkey.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ragframework.fullname" . }}-{{ .Values.valkey.name }}
+  labels:
+    {{- include "ragframework.labels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+spec:
+  type: {{ .Values.valkey.service.type }}
+  ports:
+  - port: {{ .Values.valkey.service.port }}
+    targetPort: valkey
+    protocol: TCP
+    name: valkey
+  selector:
+    {{- include "ragframework.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ragframework.fullname" . }}-{{ .Values.valkey.name }}
+  labels:
+    {{- include "ragframework.labels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+spec:
+  serviceName: {{ include "ragframework.fullname" . }}-{{ .Values.valkey.name }}
+  replicas: {{ .Values.valkey.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ragframework.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: valkey
+  template:
+    metadata:
+      labels:
+        {{- include "ragframework.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: valkey
+    spec:
+      containers:
+      - name: valkey
+        image: "{{ .Values.valkey.image.repository }}:{{ .Values.valkey.image.tag }}"
+        imagePullPolicy: {{ .Values.valkey.image.pullPolicy }}
+        ports:
+        - name: valkey
+          containerPort: 6379
+          protocol: TCP
+        resources:
+          {{- toYaml .Values.valkey.resources | nindent 10 }}
+        volumeMounts:
+        - name: data
+          mountPath: /data
+  {{- if .Values.valkey.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: {{ .Values.valkey.persistence.accessModes }}
+      {{- if .Values.valkey.persistence.storageClass }}
+      storageClassName: {{ .Values.valkey.persistence.storageClass }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.valkey.persistence.size }}
+  {{- else }}
+  volumes:
+  - name: data
+    emptyDir: {}
+  {{- end }}
+{{- end }}

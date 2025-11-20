@@ -71,7 +71,7 @@ data/
 
 # AI Assistants and Tools
 .claude/
-.github/
+.github/chatmodes
 .bmad/
 .bmad-core/
 *.bmad

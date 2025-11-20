@@ -1,0 +1,95 @@
+{{- if .Values.keycloak.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ragframework.fullname" . }}-{{ .Values.keycloak.name }}
+  labels:
+    {{- include "ragframework.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+spec:
+  type: {{ .Values.keycloak.service.type }}
+  ports:
+  - port: {{ .Values.keycloak.service.httpPort }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: {{ .Values.keycloak.service.healthPort }}
+    targetPort: health
+    protocol: TCP
+    name: health
+  selector:
+    {{- include "ragframework.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ragframework.fullname" . }}-{{ .Values.keycloak.name }}
+  labels:
+    {{- include "ragframework.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+spec:
+  serviceName: {{ include "ragframework.fullname" . }}-{{ .Values.keycloak.name }}
+  replicas: {{ .Values.keycloak.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ragframework.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: keycloak
+  template:
+    metadata:
+      labels:
+        {{- include "ragframework.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: keycloak
+    spec:
+      containers:
+      - name: keycloak
+        image: "{{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag }}"
+        imagePullPolicy: {{ .Values.keycloak.image.pullPolicy }}
+        args:
+        - "start-dev"
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: health
+          containerPort: 9000
+          protocol: TCP
+        env:
+        - name: KEYCLOAK_ADMIN
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-credentials  # Managed by gitops
+              key: admin-username
+        - name: KEYCLOAK_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-credentials  # Managed by gitops
+              key: admin-password
+        {{- range $key, $value := .Values.keycloak.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.keycloak.resources | nindent 10 }}
+        volumeMounts:
+        - name: data
+          mountPath: /opt/keycloak/data
+  {{- if .Values.keycloak.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: {{ .Values.keycloak.persistence.accessModes }}
+      {{- if .Values.keycloak.persistence.storageClass }}
+      storageClassName: {{ .Values.keycloak.persistence.storageClass }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.keycloak.persistence.size }}
+  {{- else }}
+  volumes:
+  - name: data
+    emptyDir: {}
+  {{- end }}
+{{- end }}

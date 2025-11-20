@@ -1,0 +1,151 @@
+
+================================================================================
+RAG Framework has been deployed!
+================================================================================
+
+Release Name: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+Version: {{ .Chart.Version }}
+App Version: {{ .Chart.AppVersion }}
+
+{{- if .Values.global.imageTag }}
+Deployed Image Tag: {{ .Values.global.imageTag }}
+{{- else }}
+WARNING: No image tag specified! Using 'latest' tag.
+         Set global.imageTag in your values for production deployments.
+{{- end }}
+
+================================================================================
+Services Deployed:
+================================================================================
+
+API Service:
+  Name: {{ include "ragframework.fullname" . }}-{{ .Values.api.name }}
+  Replicas: {{ .Values.api.replicaCount }}
+  Port: {{ .Values.api.service.port }}
+  {{- if .Values.api.resources }}
+  Resources: {{ .Values.api.resources.requests.cpu }} CPU, {{ .Values.api.resources.requests.memory }} RAM
+  {{- end }}
+
+Embedding Service:
+  Name: {{ include "ragframework.fullname" . }}-{{ .Values.embedding.name }}
+  Replicas: {{ .Values.embedding.replicaCount }}
+  Port: {{ .Values.embedding.service.port }}
+  {{- if .Values.embedding.resources }}
+  Resources: {{ .Values.embedding.resources.requests.cpu }} CPU, {{ .Values.embedding.resources.requests.memory }} RAM
+  {{- end }}
+
+{{- if .Values.migrations.enabled }}
+Migrations Job:
+  Name: {{ include "ragframework.fullname" . }}-{{ .Values.migrations.name }}
+  Status: Enabled (will run before deployment)
+{{- else }}
+Migrations Job:
+  Status: Disabled
+  Note: Enable in values.yaml for automatic migrations
+{{- end }}
+
+================================================================================
+Dependencies:
+================================================================================
+
+{{- if .Values.postgres.enabled }}
+✓ PostgreSQL
+{{- else }}
+✗ PostgreSQL (disabled)
+{{- end }}
+
+{{- if .Values.valkey.enabled }}
+✓ Valkey
+{{- else }}
+✗ Valkey (disabled)
+{{- end }}
+
+{{- if .Values.elasticsearch.enabled }}
+✓ Elasticsearch
+{{- else }}
+✗ Elasticsearch (disabled)
+{{- end }}
+
+{{- if .Values.qdrant.enabled }}
+✓ Qdrant
+{{- else }}
+✗ Qdrant (disabled)
+{{- end }}
+
+{{- if .Values.keycloak.enabled }}
+✓ Keycloak
+{{- else }}
+✗ Keycloak (disabled)
+{{- end }}
+
+{{- if .Values.minio.enabled }}
+✓ MinIO
+{{- else }}
+✗ MinIO (disabled)
+{{- end }}
+
+================================================================================
+Access Information:
+================================================================================
+
+To access the API service from within the cluster:
+  {{ include "ragframework.fullname" . }}-{{ .Values.api.name }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.api.service.port }}
+
+To access the Embedding service from within the cluster:
+  {{ include "ragframework.fullname" . }}-{{ .Values.embedding.name }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.embedding.service.port }}
+
+{{- if .Values.ingress.enabled }}
+
+Ingress is enabled. Access the API via:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+
+To access the API from outside the cluster, use port-forward:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "ragframework.fullname" . }}-{{ .Values.api.name }} 8080:{{ .Values.api.service.port }}
+
+Then access: http://localhost:8080
+{{- end }}
+
+================================================================================
+Health Checks:
+================================================================================
+
+API Health:
+  Liveness:  /healthz
+  Readiness: /healthz/ready
+  Admin:     /api/admin/health
+
+Embedding Health:
+  Liveness:  /health
+  Readiness: /health
+
+================================================================================
+Next Steps:
+================================================================================
+
+1. Verify pods are running:
+   kubectl get pods -n {{ .Release.Namespace }}
+
+2. Check deployment status:
+   kubectl get deployments -n {{ .Release.Namespace }}
+
+3. View logs:
+   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "ragframework.name" . }}
+
+4. Monitor resources:
+   kubectl top pods -n {{ .Release.Namespace }}
+
+{{- if not .Values.migrations.enabled }}
+
+WARNING: Migrations are disabled!
+  - For first deployment, create database schema manually
+  - Enable migrations.enabled: true for automatic migrations
+{{- end }}
+
+================================================================================
+For more information, visit:
+  https://github.com/Bardin08/RAGFramework
+================================================================================

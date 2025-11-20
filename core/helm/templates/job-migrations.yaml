@@ -1,0 +1,43 @@
+{{- if .Values.migrations.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ragframework.fullname" . }}-{{ .Values.migrations.name }}
+  labels:
+    {{- include "ragframework.migrations.labels" . | nindent 4 }}
+  annotations:
+    # ArgoCD PreSync hook - runs before deployment
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    # Helm hook for non-ArgoCD deployments
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 0  # Fail-fast, no retries
+  template:
+    metadata:
+      labels:
+        {{- include "ragframework.migrations.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ragframework.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.migrations.securityContext | nindent 8 }}
+      restartPolicy: Never
+      containers:
+      - name: {{ .Values.migrations.name }}
+        image: {{ include "ragframework.migrations.image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            secretKeyRef:
+              name: postgres-connection  # Managed by gitops
+              key: connection-string
+        resources:
+          {{- toYaml .Values.migrations.resources | nindent 10 }}
+{{- end }}
