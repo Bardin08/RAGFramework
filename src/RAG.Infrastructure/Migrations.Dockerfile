@@ -2,8 +2,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /build
 
-# Install EF Core tools
-RUN dotnet tool install --global dotnet-ef
+# Install EF Core tools with retry logic for transient failures
+RUN dotnet nuget list source || true && \
+    dotnet tool install --global dotnet-ef --version 8.0.0 || \
+    (echo "Retrying dotnet-ef installation..." && sleep 5 && dotnet tool install --global dotnet-ef --version 8.0.0)
 ENV PATH="${PATH}:/root/.dotnet/tools"
 
 # Copy solution and project files
@@ -22,8 +24,12 @@ COPY src/ src/
 WORKDIR "/build/src/RAG.Infrastructure"
 RUN dotnet build "RAG.Infrastructure.csproj" -c Release
 
+# Build the API project (required for migrations bundle startup project)
+WORKDIR "/build/src/RAG.API"
+RUN dotnet build "RAG.API.csproj" -c Release
+
 # Create EF migrations bundle
-# Note: This creates a self-contained executable that applies migrations
+WORKDIR "/build/src/RAG.Infrastructure"
 RUN dotnet ef migrations bundle \
     --project "RAG.Infrastructure.csproj" \
     --startup-project "../RAG.API/RAG.API.csproj" \
