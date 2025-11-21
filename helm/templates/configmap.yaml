@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ragframework.fullname" . }}-config
+  labels:
+    {{- include "ragframework.labels" . | nindent 4 }}
+data:
+  # Non-sensitive configuration data
+  # Sensitive configuration should be managed in gitops repository via Secrets
+
+  # Example: Application settings can be added here
+  # appsettings.json: |
+  #   {
+  #     "Logging": {
+  #       "LogLevel": {
+  #         "Default": "Information"
+  #       }
+  #     }
+  #   }

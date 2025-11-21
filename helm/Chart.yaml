@@ -1,0 +1,32 @@
+apiVersion: v2
+name: ragframework
+description: A Helm chart for RAG Framework - Retrieval-Augmented Generation system with Clean Architecture
+
+# Chart type (application or library)
+type: application
+
+# Chart version - follows SemVer 2
+version: 0.1.0
+
+# Application version - this is the version of the application being deployed
+# This should match the Docker image tag being deployed
+appVersion: "0.0.0"
+
+keywords:
+  - rag
+  - retrieval-augmented-generation
+  - ai
+  - nlp
+  - dotnet
+  - python
+
+maintainers:
+  - name: Vladyslav Bardin
+    email: bardin08@example.com
+
+home: https://github.com/Bardin08/RAGFramework
+sources:
+  - https://github.com/Bardin08/RAGFramework
+
+# Dependencies (if using external charts, currently we bundle everything)
+dependencies: []
