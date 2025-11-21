@@ -11,6 +11,21 @@ jobs:
     name: Build and Test .NET
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: rag_db
+          POSTGRES_USER: rag_user
+          POSTGRES_PASSWORD: devpassword123
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -33,6 +48,14 @@ jobs:
 
     - name: Build solution
       run: dotnet build --configuration Release --no-restore --warnaserror
+
+    - name: Install EF Core tools
+      run: dotnet tool install --global dotnet-ef --version 8.0.0
+
+    - name: Apply database migrations
+      run: dotnet ef database update --project src/RAG.Infrastructure/RAG.Infrastructure.csproj --startup-project src/RAG.API/RAG.API.csproj --configuration Release
+      env:
+        ConnectionStrings__DefaultConnection: "Host=localhost;Database=rag_db;Username=rag_user;Password=devpassword123"
 
     - name: Run unit tests with coverage
       run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
