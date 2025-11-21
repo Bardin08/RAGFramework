@@ -51,13 +51,13 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: API
+          - name: api
             context: .
             dockerfile: ./src/RAG.API/Dockerfile
-          - name: Embedding
+          - name: embedding
             context: ./python-services/embedding-service
             dockerfile: ./python-services/embedding-service/Dockerfile
-          - name: Migrations
+          - name: migrations
             context: .
             dockerfile: ./src/RAG.Infrastructure/Migrations.Dockerfile
 
