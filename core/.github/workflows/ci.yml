@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop, feat/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-and-test:
+    name: Build and Test .NET
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build solution
+      run: dotnet build --configuration Release --no-restore --warnaserror
+
+    - name: Run unit tests with coverage
+      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: ./coverage/**/coverage.cobertura.xml
+        retention-days: 30
+
+  validate-dockerfiles:
+    name: Validate Docker Images
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - name: API
+            context: .
+            dockerfile: ./src/RAG.API/Dockerfile
+          - name: Embedding
+            context: ./python-services/embedding-service
+            dockerfile: ./python-services/embedding-service/Dockerfile
+          - name: Migrations
+            context: .
+            dockerfile: ./src/RAG.Infrastructure/Migrations.Dockerfile
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build ${{ matrix.name }} image (no push)
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ matrix.context }}
+        file: ${{ matrix.dockerfile }}
+        push: false
+        tags: ragcore-${{ matrix.name }}:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: validate-dockerfiles
+
+    strategy:
+      matrix:
+        include:
+          - name: API
+            context: .
+            dockerfile: ./src/RAG.API/Dockerfile
+          - name: Embedding
+            context: ./python-services/embedding-service
+            dockerfile: ./python-services/embedding-service/Dockerfile
+          - name: Migrations
+            context: .
+            dockerfile: ./src/RAG.Infrastructure/Migrations.Dockerfile
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build ${{ matrix.name }} image for scanning
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ matrix.context }}
+        file: ${{ matrix.dockerfile }}
+        push: false
+        load: true
+        tags: ragcore-${{ matrix.name }}:scan
+        cache-from: type=gha
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ragcore-${{ matrix.name }}:scan
+        format: 'sarif'
+        output: 'trivy-results-${{ matrix.name }}.sarif'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results-${{ matrix.name }}.sarif'
+        category: 'trivy-${{ matrix.name }}'
+
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [build-and-test, validate-dockerfiles, security-scan]
+    if: always()
+
+    steps:
+    - name: Generate summary
+      run: |
+        echo "## CI Results 🔍" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Build & Test | ${{ needs.build-and-test.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Docker Validation | ${{ needs.validate-dockerfiles.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Security Scan | ${{ needs.security-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY

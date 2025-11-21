@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ragframework.fullname" . }}-{{ .Values.embedding.name }}
+  labels:
+    {{- include "ragframework.embedding.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.embedding.service.type }}
+  ports:
+  - port: {{ .Values.embedding.service.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "ragframework.embedding.selectorLabels" . | nindent 4 }}
