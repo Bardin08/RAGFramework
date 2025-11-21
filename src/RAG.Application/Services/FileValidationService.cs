@@ -15,6 +15,9 @@ public class FileValidationService : IFileValidationService
     {
         var errors = new List<string>();
 
+        if (file == null)
+            return FileValidationResult.Failure("File is required");
+
         switch (file.Length)
         {
             case 0:
