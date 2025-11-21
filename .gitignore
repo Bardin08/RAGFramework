@@ -85,6 +85,19 @@ data/
 # Thesis artifacts and documentation
 *.docx
 *.pdf
-docs/
 source-papers/
 web-bundles/
+
+# Keep project documentation but ignore chapters/thesis docs
+docs/chapters/
+docs/stories/
+docs/prd/
+docs/setup/
+docs/architecture.md
+docs/brief.md
+docs/prd*.md
+docs/research-analysis.md
+docs/roadmap*.md
+
+# Keep deployment docs
+!docs/deployment/
