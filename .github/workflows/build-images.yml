@@ -26,6 +26,9 @@ jobs:
     outputs:
       version_tag: ${{ steps.validate.outputs.version_tag }}
       short_sha: ${{ steps.validate.outputs.short_sha }}
+      major: ${{ steps.validate.outputs.major }}
+      minor: ${{ steps.validate.outputs.minor }}
+      patch: ${{ steps.validate.outputs.patch }}
 
     steps:
       - name: Checkout code
