@@ -109,13 +109,16 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: API
+          - name: api
+            display_name: API
             context: .
             dockerfile: ./src/RAG.API/Dockerfile
-          - name: Embedding
+          - name: embedding
+            display_name: Embedding
             context: ./python-services/embedding-service
             dockerfile: ./python-services/embedding-service/Dockerfile
-          - name: Migrations
+          - name: migrations
+            display_name: Migrations
             context: .
             dockerfile: ./src/RAG.Infrastructure/Migrations.Dockerfile
 
@@ -126,7 +129,7 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build ${{ matrix.name }} image for scanning
+    - name: Build ${{ matrix.display_name }} image for scanning
       uses: docker/build-push-action@v5
       with:
         context: ${{ matrix.context }}
@@ -145,7 +148,7 @@ jobs:
         severity: 'CRITICAL,HIGH'
 
     - name: Upload Trivy results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results-${{ matrix.name }}.sarif'
