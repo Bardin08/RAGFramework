@@ -1,6 +1,6 @@
 # Stage 1: Build
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
+WORKDIR /build
 
 # Copy solution and project files
 COPY ["src/RAG.API/RAG.API.csproj", "src/RAG.API/"]
@@ -12,10 +12,10 @@ COPY ["src/RAG.Infrastructure/RAG.Infrastructure.csproj", "src/RAG.Infrastructur
 RUN dotnet restore "src/RAG.API/RAG.API.csproj"
 
 # Copy all source code
-COPY . .
+COPY src/ src/
 
 # Build the application
-WORKDIR "/src/src/RAG.API"
+WORKDIR "/build/src/RAG.API"
 RUN dotnet build "RAG.API.csproj" -c Release -o /app/build
 
 # Stage 2: Publish

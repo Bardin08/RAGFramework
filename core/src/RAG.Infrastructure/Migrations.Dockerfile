@@ -1,6 +1,6 @@
 # Stage 1: Build and create EF Bundle
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
+WORKDIR /build
 
 # Install EF Core tools
 RUN dotnet tool install --global dotnet-ef
@@ -16,10 +16,10 @@ COPY ["src/RAG.Infrastructure/RAG.Infrastructure.csproj", "src/RAG.Infrastructur
 RUN dotnet restore "src/RAG.Infrastructure/RAG.Infrastructure.csproj"
 
 # Copy all source code
-COPY . .
+COPY src/ src/
 
 # Build the infrastructure project
-WORKDIR "/src/src/RAG.Infrastructure"
+WORKDIR "/build/src/RAG.Infrastructure"
 RUN dotnet build "RAG.Infrastructure.csproj" -c Release
 
 # Create EF migrations bundle
