@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RAG.Application.Services;
+using RAG.Core.Configuration;
 using RAG.Core.Domain;
 
 namespace RAG.Infrastructure.Services;
@@ -14,6 +16,7 @@ public class HealthCheckService : IHealthCheckService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IMemoryCache _cache;
     private readonly ILogger<HealthCheckService> _logger;
+    private readonly AppSettings _appSettings;
 
     private const int TimeoutSeconds = 5;
     private const int CacheDurationSeconds = 10;
@@ -25,14 +28,17 @@ public class HealthCheckService : IHealthCheckService
     /// <param name="httpClientFactory">The HTTP client factory.</param>
     /// <param name="cache">The memory cache.</param>
     /// <param name="logger">The logger.</param>
+    /// <param name="appSettings">The application settings.</param>
     public HealthCheckService(
         IHttpClientFactory httpClientFactory,
         IMemoryCache cache,
-        ILogger<HealthCheckService> logger)
+        ILogger<HealthCheckService> logger,
+        IOptions<AppSettings> appSettings)
     {
         _httpClientFactory = httpClientFactory;
         _cache = cache;
         _logger = logger;
+        _appSettings = appSettings.Value;
     }
 
     /// <inheritdoc/>
@@ -87,7 +93,8 @@ public class HealthCheckService : IHealthCheckService
             client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
 
             var sw = Stopwatch.StartNew();
-            var response = await client.GetAsync("http://localhost:9200/_cluster/health");
+            var healthUrl = $"{_appSettings.Elasticsearch.Url}/_cluster/health";
+            var response = await client.GetAsync(healthUrl);
             sw.Stop();
 
             services[serviceName] = new ServiceHealth
@@ -119,7 +126,8 @@ public class HealthCheckService : IHealthCheckService
             client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
 
             var sw = Stopwatch.StartNew();
-            var response = await client.GetAsync("http://localhost:6333/healthz");
+            var healthUrl = $"{_appSettings.Qdrant.Url}/healthz";
+            var response = await client.GetAsync(healthUrl);
             sw.Stop();
 
             services[serviceName] = new ServiceHealth
@@ -151,7 +159,9 @@ public class HealthCheckService : IHealthCheckService
             client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
 
             var sw = Stopwatch.StartNew();
-            var response = await client.GetAsync("http://localhost:9000/health");
+            // Keycloak health endpoint is at /health/ready in newer versions
+            var healthUrl = $"{_appSettings.Keycloak.Authority.Replace("/realms/rag-system", "")}/health/ready";
+            var response = await client.GetAsync(healthUrl);
             sw.Stop();
 
             services[serviceName] = new ServiceHealth
@@ -183,7 +193,8 @@ public class HealthCheckService : IHealthCheckService
             client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
 
             var sw = Stopwatch.StartNew();
-            var response = await client.GetAsync("http://localhost:8001/health");
+            var healthUrl = $"{_appSettings.EmbeddingService.Url}/health";
+            var response = await client.GetAsync(healthUrl);
             sw.Stop();
 
             services[serviceName] = new ServiceHealth
