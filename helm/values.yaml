@@ -74,6 +74,20 @@ api:
   env:
     ASPNETCORE_ENVIRONMENT: "Production"
     ASPNETCORE_URLS: "http://+:8080"
+    # Service endpoints - these override appsettings.json values
+    # Format: SectionName__PropertyName for ASP.NET Core configuration
+    ConnectionStrings__DefaultConnection: "Host=ragframework-postgres:5432;Database=rag_db;Username=rag_user;Password=devpassword123"
+    Elasticsearch__Url: "http://ragframework-elasticsearch:9200"
+    Qdrant__Url: "http://ragframework-qdrant:6333"
+    EmbeddingService__Url: "http://ragframework-ragcore-embedding:8001"
+    Ollama__Url: "http://ollama:11434"
+    Keycloak__Authority: "http://ragframework-keycloak:8080/realms/rag-system"
+    Keycloak__Audience: "rag-api"
+    MinIO__Endpoint: "ragframework-minio:9000"
+    MinIO__AccessKey: "minioadmin"
+    MinIO__SecretKey: "minioadmin"
+    MinIO__BucketName: "rag-documents"
+    MinIO__UseSSL: "false"
 
   # ConfigMap for application settings (managed in gitops for sensitive data)
   # config: {}
