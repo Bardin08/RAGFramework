@@ -70,27 +70,76 @@ api:
       drop:
         - ALL
 
-  # Environment variables (non-sensitive)
+  # Environment variables
+  # Supports both static values and secret/configmap references
+  #
+  # Static value example:
+  #   VARIABLE_NAME: "static-value"
+  #
+  # Secret reference example:
+  #   VARIABLE_NAME:
+  #     secretKeyRef:
+  #       name: my-secret
+  #       key: secret-key
+  #
+  # ConfigMap reference example:
+  #   VARIABLE_NAME:
+  #     configMapKeyRef:
+  #       name: my-config
+  #       key: config-key
   env:
     ASPNETCORE_ENVIRONMENT: "Production"
     ASPNETCORE_URLS: "http://+:8080"
+
     # Service endpoints - these override appsettings.json values
     # Format: SectionName__PropertyName for ASP.NET Core configuration
+
+    # Database connection (use secret reference in production)
     ConnectionStrings__DefaultConnection: "Host=ragframework-postgres:5432;Database=rag_db;Username=rag_user;Password=devpassword123"
+    # Example with secret:
+    # ConnectionStrings__DefaultConnection:
+    #   secretKeyRef:
+    #     name: postgres-credentials
+    #     key: connection-string
+
+    # Service URLs
     Elasticsearch__Url: "http://ragframework-elasticsearch:9200"
     Qdrant__Url: "http://ragframework-qdrant:6333"
     EmbeddingService__Url: "http://ragframework-ragcore-embedding:8001"
     Ollama__Url: "http://ollama:11434"
+
+    # Authentication
     Keycloak__Authority: "http://ragframework-keycloak:8080/realms/rag-system"
     Keycloak__Audience: "rag-api"
+
+    # Object storage
     MinIO__Endpoint: "ragframework-minio:9000"
-    MinIO__AccessKey: "minioadmin"
-    MinIO__SecretKey: "minioadmin"
     MinIO__BucketName: "rag-documents"
     MinIO__UseSSL: "false"
+    MinIO__AccessKey: "minioadmin"
+    MinIO__SecretKey: "minioadmin"
+    # Example with secrets:
+    # MinIO__AccessKey:
+    #   secretKeyRef:
+    #     name: minio-credentials
+    #     key: access-key
+    # MinIO__SecretKey:
+    #   secretKeyRef:
+    #     name: minio-credentials
+    #     key: secret-key
 
-  # ConfigMap for application settings (managed in gitops for sensitive data)
-  # config: {}
+    # OpenAI API Key (should use secret in production)
+    # OpenAI__ApiKey:
+    #   secretKeyRef:
+    #     name: openai-credentials
+    #     key: api-key
+
+  # Alternative: Load all environment variables from secrets/configmaps
+  # envFrom:
+  #   - secretRef:
+  #       name: api-secrets
+  #   - configMapRef:
+  #       name: api-config
 
 # Embedding Service
 embedding:

@@ -39,7 +39,27 @@ spec:
         env:
         {{- range $key, $value := .Values.api.env }}
         - name: {{ $key }}
+          {{- if kindIs "map" $value }}
+          valueFrom:
+            {{- if $value.secretKeyRef }}
+            secretKeyRef:
+              name: {{ $value.secretKeyRef.name }}
+              key: {{ $value.secretKeyRef.key }}
+            {{- else if $value.configMapKeyRef }}
+            configMapKeyRef:
+              name: {{ $value.configMapKeyRef.name }}
+              key: {{ $value.configMapKeyRef.key }}
+            {{- else if $value.fieldRef }}
+            fieldRef:
+              fieldPath: {{ $value.fieldRef.fieldPath }}
+            {{- end }}
+          {{- else }}
           value: {{ $value | quote }}
+          {{- end }}
+        {{- end }}
+        {{- with .Values.api.envFrom }}
+        envFrom:
+        {{- toYaml . | nindent 8 }}
         {{- end }}
         livenessProbe:
           {{- toYaml .Values.api.livenessProbe | nindent 10 }}
