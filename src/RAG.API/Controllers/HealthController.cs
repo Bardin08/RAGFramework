@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RAG.Application.Services;
 using RAG.Core.Domain;
@@ -75,11 +76,12 @@ public class HealthController : ControllerBase
     /// Detailed health status of all services
     /// </summary>
     /// <remarks>
-    /// Returns detailed JSON with health status of all RAG system dependencies. Requires authentication in production.
+    /// Returns detailed JSON with health status of all RAG system dependencies. Requires authentication.
     /// </remarks>
     /// <response code="200">Detailed health status retrieved successfully</response>
     /// <response code="401">Unauthorized</response>
     /// <response code="503">Service unavailable</response>
+    [Authorize]
     [HttpGet("/api/admin/health")]
     [ProducesResponseType(typeof(HealthStatus), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
