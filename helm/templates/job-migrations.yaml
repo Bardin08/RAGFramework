@@ -33,12 +33,33 @@ spec:
       - name: {{ .Values.migrations.name }}
         image: {{ include "ragframework.migrations.image" . }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        env:
-        - name: ConnectionStrings__DefaultConnection
-          valueFrom:
-            secretKeyRef:
-              name: postgres-connection  # Managed by gitops
-              key: connection-string
+      env:
+      - name: ConnectionStrings__DefaultConnection
+        valueFrom:
+          secretKeyRef:
+            name: postgres-connection
+            key: connection-string
+      {{- if .Values.migrations.env }}
+      {{- range $key, $value := .Values.migrations.env }}
+      - name: {{ $key }}
+        {{- if kindIs "map" $value }}
+        {{- if $value.secretKeyRef }}
+        valueFrom:
+          secretKeyRef:
+            name: {{ $value.secretKeyRef.name }}
+            key: {{ $value.secretKeyRef.key }}
+        {{- else if $value.configMapKeyRef }}
+        valueFrom:
+          configMapKeyRef:
+            name: {{ $value.configMapKeyRef.name }}
+            key: {{ $value.configMapKeyRef.key }}
+        {{- end }}
+        {{- else }}
+        value: {{ $value | quote }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+
         volumeMounts:
         - name: appsettings
           mountPath: /app/appsettings.json
