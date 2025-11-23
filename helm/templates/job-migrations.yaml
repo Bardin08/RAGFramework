@@ -28,6 +28,10 @@ spec:
       securityContext:
         {{- toYaml .Values.migrations.securityContext | nindent 8 }}
       restartPolicy: Never
+      volumes:
+      - name: appsettings
+        configMap:
+          name: {{ include "ragframework.fullname" . }}-migrations-config
       containers:
       - name: {{ .Values.migrations.name }}
         image: {{ include "ragframework.migrations.image" . }}
@@ -38,6 +42,11 @@ spec:
             secretKeyRef:
               name: postgres-connection  # Managed by gitops
               key: connection-string
+        volumeMounts:
+        - name: appsettings
+          mountPath: /app/appsettings.json
+          subPath: appsettings.json
+          readOnly: true
         resources:
           {{- toYaml .Values.migrations.resources | nindent 10 }}
 {{- end }}
