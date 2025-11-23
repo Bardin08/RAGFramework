@@ -58,6 +58,9 @@ public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>
     [Fact]
     public async Task AdminHealth_ReturnsDetailedJson()
     {
+        // Arrange
+        _client.DefaultRequestHeaders.Add("Authorization", "Bearer dev-test-token-12345");
+
         // Act
         var response = await _client.GetAsync("/api/admin/health");
 
@@ -77,6 +80,9 @@ public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>
     [Fact]
     public async Task AdminHealth_ContainsExpectedServices()
     {
+        // Arrange
+        _client.DefaultRequestHeaders.Add("Authorization", "Bearer dev-test-token-12345");
+
         // Act
         var response = await _client.GetAsync("/api/admin/health");
         var healthStatus = await response.Content.ReadFromJsonAsync<HealthStatus>();
@@ -92,6 +98,9 @@ public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>
     [Fact]
     public async Task AdminHealth_CachingWorks()
     {
+        // Arrange
+        _client.DefaultRequestHeaders.Add("Authorization", "Bearer dev-test-token-12345");
+
         // Act - Make two requests within cache duration (10 seconds)
         var response1 = await _client.GetAsync("/api/admin/health");
         var healthStatus1 = await response1.Content.ReadFromJsonAsync<HealthStatus>();
