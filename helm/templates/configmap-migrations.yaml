@@ -1,0 +1,21 @@
+{{- if .Values.migrations.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ragframework.fullname" . }}-migrations-config
+  labels:
+    {{- include "ragframework.migrations.labels" . | nindent 4 }}
+data:
+  appsettings.json: |
+    {
+      "ConnectionStrings": {
+        "DefaultConnection": ""
+      },
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.EntityFrameworkCore": "Warning"
+        }
+      }
+    }
+{{- end }}

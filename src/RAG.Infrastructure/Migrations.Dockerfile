@@ -20,38 +20,31 @@ RUN dotnet restore "src/RAG.Infrastructure/RAG.Infrastructure.csproj"
 # Copy all source code
 COPY src/ src/
 
-# Build the infrastructure project
-WORKDIR "/build/src/RAG.Infrastructure"
-RUN dotnet build "RAG.Infrastructure.csproj" -c Release
-
-# Build the API project (required for migrations bundle startup project)
-WORKDIR "/build/src/RAG.API"
-RUN dotnet build "RAG.API.csproj" -c Release
-
 # Create EF migrations bundle
+# Set the working directory back to Infrastructure for the bundle creation
 WORKDIR "/build/src/RAG.Infrastructure"
 RUN dotnet ef migrations bundle \
     --project "RAG.Infrastructure.csproj" \
     --startup-project "../RAG.API/RAG.API.csproj" \
     --configuration Release \
     --output /app/efbundle \
-    --self-contained \
-    --runtime linux-x64 \
     --force
 
 # Stage 2: Runtime (minimal image)
-FROM mcr.microsoft.com/dotnet/runtime:8.0-alpine AS final
+# Using ASP.NET Core runtime because the EF bundle requires it
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 
-# Create non-root user
-RUN addgroup -S migrationuser && adduser -S migrationuser -G migrationuser
+# Create non-root user with UID 1000 to match Kubernetes securityContext
+RUN groupadd -g 1000 migrationuser && useradd -u 1000 -g migrationuser -m migrationuser
 
 WORKDIR /app
 
 # Copy the migrations bundle
 COPY --from=build /app/efbundle .
 
-# Set ownership
-RUN chown -R migrationuser:migrationuser /app && \
+# Create a writable directory for bundle extraction in the user's home
+RUN mkdir -p /home/migrationuser/.dotnet/bundle && \
+    chown -R migrationuser:migrationuser /app /home/migrationuser && \
     chmod +x efbundle
 
 # Switch to non-root user
@@ -59,6 +52,9 @@ USER migrationuser
 
 # The bundle requires connection string via environment variable
 ENV ASPNETCORE_ENVIRONMENT=Production
+
+# Set the bundle extraction directory to user's home directory
+ENV DOTNET_BUNDLE_EXTRACT_BASE_DIR=/home/migrationuser/.dotnet/bundle
 
 # Run migrations
 # Connection string should be provided via env var: ConnectionStrings__DefaultConnection
