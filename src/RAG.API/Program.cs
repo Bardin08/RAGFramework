@@ -195,11 +195,15 @@ try
         };
     });
 
-    // Configure the HTTP request pipeline.
+    Console.WriteLine("Current Environment: " + app.Environment.EnvironmentName);
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
         app.UseSwaggerUI();
+    }
+    else
+    {
+        Console.WriteLine($"Swagger UI middleware was not added. Current environment is: {app.Environment.EnvironmentName}.");
     }
 
     app.UseAuthentication();
