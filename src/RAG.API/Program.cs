@@ -64,6 +64,8 @@ try
         builder.Configuration.GetSection("Keycloak"));
     builder.Services.Configure<MinIOSettings>(
         builder.Configuration.GetSection("MinIO"));
+    builder.Services.Configure<ChunkingOptions>(
+        builder.Configuration.GetSection("Chunking"));
 
     // Configure authentication
     if (builder.Environment.IsDevelopment())
@@ -161,6 +163,7 @@ try
     builder.Services.AddScoped<IDocumentStorageService, MinIODocumentStorageService>();
     builder.Services.AddSingleton<IHashService, Sha256HashService>();
     builder.Services.AddScoped<IDocumentHashRepository, DocumentHashRepository>();
+    builder.Services.AddScoped<IChunkingStrategy, RAG.Infrastructure.Chunking.SlidingWindowChunker>();
     builder.Services.AddHttpContextAccessor();
 
     // Register health check service
