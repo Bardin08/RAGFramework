@@ -49,6 +49,18 @@ public class InMemoryDocumentStorageService : IDocumentStorageService
         return Task.FromResult<Stream?>(null);
     }
 
+    /// <inheritdoc />
+    public Task DeleteFileAsync(
+        Guid documentId,
+        Guid tenantId,
+        string fileName,
+        CancellationToken cancellationToken = default)
+    {
+        var key = GetStorageKey(documentId, tenantId);
+        _storage.TryRemove(key, out _);
+        return Task.CompletedTask;
+    }
+
     private static string GetStorageKey(Guid documentId, Guid tenantId) =>
         $"{tenantId}:{documentId}";
 }

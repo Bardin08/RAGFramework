@@ -36,9 +36,14 @@ public class Document
     public List<Guid> ChunkIds { get; init; }
 
     /// <summary>
+    /// Tenant ID for multi-tenancy isolation.
+    /// </summary>
+    public Guid TenantId { get; init; }
+
+    /// <summary>
     /// Creates a new Document instance with validation.
     /// </summary>
-    public Document(Guid id, string title, string content, string? source = null,
+    public Document(Guid id, string title, string content, Guid tenantId, string? source = null,
         Dictionary<string, object>? metadata = null, List<Guid>? chunkIds = null)
     {
         if (id == Guid.Empty)
@@ -50,9 +55,13 @@ public class Document
         if (string.IsNullOrWhiteSpace(content))
             throw new ArgumentException("Document content cannot be empty", nameof(content));
 
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("Tenant ID cannot be empty", nameof(tenantId));
+
         Id = id;
         Title = title;
         Content = content;
+        TenantId = tenantId;
         Source = source;
         Metadata = metadata ?? new Dictionary<string, object>();
         ChunkIds = chunkIds ?? new List<Guid>();

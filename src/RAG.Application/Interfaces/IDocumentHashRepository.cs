@@ -39,4 +39,12 @@ public interface IDocumentHashRepository
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if exists, false otherwise</returns>
     Task<bool> ExistsAsync(string hash, Guid tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes a document hash record by document ID.
+    /// </summary>
+    /// <param name="documentId">The document ID</param>
+    /// <param name="tenantId">The tenant ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task DeleteByDocumentIdAsync(Guid documentId, Guid tenantId, CancellationToken cancellationToken = default);
 }

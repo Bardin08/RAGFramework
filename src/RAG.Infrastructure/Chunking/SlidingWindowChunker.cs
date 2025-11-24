@@ -24,7 +24,7 @@ public class SlidingWindowChunker : IChunkingStrategy
     }
 
     /// <inheritdoc />
-    public async Task<List<DocumentChunk>> ChunkAsync(string text, Guid documentId, CancellationToken cancellationToken = default)
+    public async Task<List<DocumentChunk>> ChunkAsync(string text, Guid documentId, Guid tenantId, CancellationToken cancellationToken = default)
     {
         // Handle edge case: null or empty text
         if (string.IsNullOrEmpty(text))
@@ -36,6 +36,11 @@ public class SlidingWindowChunker : IChunkingStrategy
         if (documentId == Guid.Empty)
         {
             throw new ArgumentException("DocumentId cannot be empty", nameof(documentId));
+        }
+
+        if (tenantId == Guid.Empty)
+        {
+            throw new ArgumentException("TenantId cannot be empty", nameof(tenantId));
         }
 
         // Tokenize text into words
@@ -61,6 +66,7 @@ public class SlidingWindowChunker : IChunkingStrategy
                 startIndex: 0,
                 endIndex: text.Length,
                 chunkIndex: 0,
+                tenantId: tenantId,
                 metadata: new Dictionary<string, object>
                 {
                     { "TokenCount", (int)(totalWords * TokenToWordRatio) },
@@ -100,6 +106,7 @@ public class SlidingWindowChunker : IChunkingStrategy
                 startIndex: startCharIndex,
                 endIndex: endCharIndex,
                 chunkIndex: chunkIndex,
+                tenantId: tenantId,
                 metadata: new Dictionary<string, object>
                 {
                     { "TokenCount", estimatedTokens },

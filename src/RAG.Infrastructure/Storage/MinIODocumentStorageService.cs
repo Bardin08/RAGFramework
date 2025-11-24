@@ -56,6 +56,24 @@ public class MinIODocumentStorageService : IDocumentStorageService
             cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task DeleteFileAsync(
+        Guid documentId,
+        Guid tenantId,
+        string fileName,
+        CancellationToken cancellationToken = default)
+    {
+        await _minioClient.DeleteDocumentAsync(
+            documentId,
+            tenantId,
+            fileName,
+            cancellationToken);
+
+        // Remove from cache
+        var key = GetCacheKey(documentId, tenantId);
+        _fileNameCache.TryRemove(key, out _);
+    }
+
     private static string GetCacheKey(Guid documentId, Guid tenantId) =>
         $"{tenantId}:{documentId}";
 }

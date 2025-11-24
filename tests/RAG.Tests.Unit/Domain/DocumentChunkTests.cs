@@ -12,6 +12,7 @@ public class DocumentChunkTests
         // Arrange
         var id = Guid.NewGuid();
         var documentId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
         var text = "This is a chunk of text";
         var startIndex = 0;
         var endIndex = 23;
@@ -23,7 +24,7 @@ public class DocumentChunkTests
         };
 
         // Act
-        var chunk = new DocumentChunk(id, documentId, text, startIndex, endIndex, chunkIndex, metadata);
+        var chunk = new DocumentChunk(id, documentId, text, startIndex, endIndex, chunkIndex, tenantId, metadata);
 
         // Assert
         chunk.ShouldNotBeNull();
@@ -33,6 +34,7 @@ public class DocumentChunkTests
         chunk.StartIndex.ShouldBe(startIndex);
         chunk.EndIndex.ShouldBe(endIndex);
         chunk.ChunkIndex.ShouldBe(chunkIndex);
+        chunk.TenantId.ShouldBe(tenantId);
         chunk.Metadata.ShouldNotBeNull();
         chunk.Metadata.Count.ShouldBe(2);
         chunk.Metadata["TokenCount"].ShouldBe(100);
@@ -46,7 +48,7 @@ public class DocumentChunkTests
         var text = "Test text";
 
         // Act
-        var chunk = new DocumentChunk(Guid.Empty, documentId, text, 0, 9, 0);
+        var chunk = new DocumentChunk(Guid.Empty, documentId, text, 0, 9, 0, Guid.NewGuid());
 
         // Assert
         chunk.Id.ShouldNotBe(Guid.Empty);
@@ -57,7 +59,7 @@ public class DocumentChunkTests
     {
         // Arrange & Act & Assert
         Should.Throw<ArgumentException>(() =>
-            new DocumentChunk(Guid.NewGuid(), Guid.Empty, "text", 0, 10, 0))
+            new DocumentChunk(Guid.NewGuid(), Guid.Empty, "text", 0, 10, 0, Guid.NewGuid()))
             .Message.ShouldContain("DocumentId cannot be empty");
     }
 
@@ -68,7 +70,7 @@ public class DocumentChunkTests
     {
         // Arrange & Act & Assert
         Should.Throw<ArgumentException>(() =>
-            new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), invalidText!, 0, 10, 0))
+            new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), invalidText!, 0, 10, 0, Guid.NewGuid()))
             .Message.ShouldContain("Text cannot be null or empty");
     }
 
@@ -77,7 +79,7 @@ public class DocumentChunkTests
     {
         // Arrange & Act & Assert
         Should.Throw<ArgumentOutOfRangeException>(() =>
-            new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), "text", -1, 10, 0))
+            new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), "text", -1, 10, 0, Guid.NewGuid()))
             .Message.ShouldContain("StartIndex must be >= 0");
     }
 
@@ -86,7 +88,7 @@ public class DocumentChunkTests
     {
         // Arrange & Act & Assert
         Should.Throw<ArgumentOutOfRangeException>(() =>
-            new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), "text", 10, 5, 0))
+            new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), "text", 10, 5, 0, Guid.NewGuid()))
             .Message.ShouldContain("EndIndex must be > StartIndex");
     }
 
@@ -95,7 +97,7 @@ public class DocumentChunkTests
     {
         // Arrange & Act & Assert
         Should.Throw<ArgumentOutOfRangeException>(() =>
-            new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), "text", 10, 10, 0))
+            new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), "text", 10, 10, 0, Guid.NewGuid()))
             .Message.ShouldContain("EndIndex must be > StartIndex");
     }
 
@@ -103,7 +105,7 @@ public class DocumentChunkTests
     public void Constructor_WithNullMetadata_CreatesEmptyMetadata()
     {
         // Arrange & Act
-        var chunk = new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), "text", 0, 10, 0, metadata: null);
+        var chunk = new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), "text", 0, 10, 0, Guid.NewGuid(), metadata: null);
 
         // Assert
         chunk.Metadata.ShouldNotBeNull();
@@ -118,7 +120,7 @@ public class DocumentChunkTests
         // The test passes if the code compiles correctly with init-only properties
 
         // Arrange
-        var chunk = new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), "text", 0, 10, 0);
+        var chunk = new DocumentChunk(Guid.NewGuid(), Guid.NewGuid(), "text", 0, 10, 0, Guid.NewGuid());
 
         // Assert - properties are initialized via constructor
         chunk.Id.ShouldNotBe(Guid.Empty);
@@ -143,7 +145,8 @@ public class DocumentChunkTests
         };
 
         // Act
-        var chunk = new DocumentChunk(id, documentId, "Sample chunk text", 100, 117, 5, metadata);
+        var tenantId = Guid.NewGuid();
+        var chunk = new DocumentChunk(id, documentId, "Sample chunk text", 100, 117, 5, tenantId, metadata);
 
         // Assert
         chunk.Id.ShouldBe(id);
@@ -152,6 +155,7 @@ public class DocumentChunkTests
         chunk.StartIndex.ShouldBe(100);
         chunk.EndIndex.ShouldBe(117);
         chunk.ChunkIndex.ShouldBe(5);
+        chunk.TenantId.ShouldBe(tenantId);
         chunk.Metadata.Count.ShouldBe(3);
         chunk.Metadata["TokenCount"].ShouldBe(50);
         chunk.Metadata["WordCount"].ShouldBe(40);

@@ -17,8 +17,9 @@ public interface IChunkingStrategy
     /// </summary>
     /// <param name="text">The text content to be chunked. Must not be null or empty.</param>
     /// <param name="documentId">The unique identifier of the source document. Used to link chunks back to their parent document.</param>
+    /// <param name="tenantId">The tenant identifier for multi-tenancy isolation.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the operation if needed.</param>
     /// <returns>A task that represents the asynchronous operation. The task result contains a list of document chunks.</returns>
-    /// <exception cref="ArgumentException">Thrown when text is null or empty, or documentId is empty.</exception>
-    Task<List<DocumentChunk>> ChunkAsync(string text, Guid documentId, CancellationToken cancellationToken = default);
+    /// <exception cref="ArgumentException">Thrown when text is null or empty, or documentId/tenantId is empty.</exception>
+    Task<List<DocumentChunk>> ChunkAsync(string text, Guid documentId, Guid tenantId, CancellationToken cancellationToken = default);
 }

@@ -36,7 +36,7 @@ public class SlidingWindowChunkerTests
         var documentId = Guid.NewGuid();
 
         // Act
-        var result = await chunker.ChunkAsync("", documentId);
+        var result = await chunker.ChunkAsync("", documentId, Guid.NewGuid());
 
         // Assert
         result.ShouldNotBeNull();
@@ -51,7 +51,7 @@ public class SlidingWindowChunkerTests
         var documentId = Guid.NewGuid();
 
         // Act
-        var result = await chunker.ChunkAsync(null!, documentId);
+        var result = await chunker.ChunkAsync(null!, documentId, Guid.NewGuid());
 
         // Assert
         result.ShouldNotBeNull();
@@ -66,7 +66,7 @@ public class SlidingWindowChunkerTests
 
         // Act & Assert
         await Should.ThrowAsync<ArgumentException>(async () =>
-            await chunker.ChunkAsync("test text", Guid.Empty));
+            await chunker.ChunkAsync("test text", Guid.Empty, Guid.NewGuid()));
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public class SlidingWindowChunkerTests
         var text = "This is a short text with only a few words.";
 
         // Act
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         result.Count.ShouldBe(1);
@@ -103,7 +103,7 @@ public class SlidingWindowChunkerTests
         var text = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty";
 
         // Act
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         result.Count.ShouldBe(1);
@@ -125,7 +125,7 @@ public class SlidingWindowChunkerTests
                    "word41 word42 word43 word44 word45 word46 word47 word48 word49 word50";
 
         // Act
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         result.Count.ShouldBeGreaterThan(1);
@@ -149,7 +149,7 @@ public class SlidingWindowChunkerTests
                    "word21 word22 word23 word24 word25 word26 word27 word28 word29 word30";
 
         // Act
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         result.Count.ShouldBeGreaterThan(1);
@@ -179,7 +179,7 @@ public class SlidingWindowChunkerTests
                    "This text should be split into multiple overlapping chunks for testing purposes.";
 
         // Act
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         result.Count.ShouldBeGreaterThan(0);
@@ -208,7 +208,7 @@ public class SlidingWindowChunkerTests
                    "word11 word12 word13 word14 word15 word16 word17 word18 word19 word20";
 
         // Act
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         foreach (var chunk in result)
@@ -230,7 +230,7 @@ public class SlidingWindowChunkerTests
         var text = string.Join(" ", Enumerable.Range(1, 60).Select(i => $"word{i}"));
 
         // Act
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         result.Count.ShouldBeGreaterThan(1);
@@ -249,7 +249,7 @@ public class SlidingWindowChunkerTests
         var text = "This is a test sentence with several words to chunk.";
 
         // Act
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         result.Count.ShouldBeGreaterThan(0);
@@ -275,7 +275,7 @@ public class SlidingWindowChunkerTests
         var text = string.Join(" ", Enumerable.Range(1, 30).Select(i => $"word{i}"));
 
         // Act
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         // With smaller chunk size, we should get more chunks
@@ -292,7 +292,7 @@ public class SlidingWindowChunkerTests
         var text = string.Join(" ", Enumerable.Range(1, 50).Select(i => $"word{i}"));
 
         // Act
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         result.Count.ShouldBeGreaterThan(1);
@@ -317,7 +317,7 @@ public class SlidingWindowChunkerTests
 
         // Act
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var result = await chunker.ChunkAsync(text, documentId);
+        var result = await chunker.ChunkAsync(text, documentId, Guid.NewGuid());
         stopwatch.Stop();
 
         // Assert

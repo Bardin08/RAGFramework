@@ -46,7 +46,7 @@ public class ChunkingIntegrationTests
         var documentId = Guid.NewGuid();
 
         // Act
-        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId);
+        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         chunks.ShouldNotBeNull();
@@ -80,7 +80,7 @@ public class ChunkingIntegrationTests
         var text = string.Join("\n\n", paragraphs);
 
         // Act
-        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId);
+        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         chunks.Count.ShouldBeGreaterThan(1);
@@ -113,7 +113,7 @@ This approach significantly reduces hallucinations and improves factual accuracy
 The chunking strategy plays a critical role in maintaining context while optimizing retrieval performance.";
 
         // Act
-        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId);
+        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         chunks.Count.ShouldBeGreaterThan(0);
@@ -147,7 +147,7 @@ Mathematical symbols: α β γ δ ε ∑ ∏ ∫ √ ∞
 Emojis: 😀 🎉 🚀 💻 📚";
 
         // Act
-        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId);
+        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         chunks.Count.ShouldBeGreaterThan(0);
@@ -177,7 +177,7 @@ Emojis: 😀 🎉 🚀 💻 📚";
 
         // Act
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId);
+        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId, Guid.NewGuid());
         stopwatch.Stop();
 
         // Assert
@@ -205,7 +205,7 @@ Emojis: 😀 🎉 🚀 💻 📚";
         var text = string.Join(" ", Enumerable.Range(1, 500).Select(i => $"word{i}"));
 
         // Act
-        var chunks = await customChunker.ChunkAsync(text, documentId);
+        var chunks = await customChunker.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         // With smaller chunk size, we should get more chunks
@@ -220,7 +220,7 @@ Emojis: 😀 🎉 🚀 💻 📚";
         var text = string.Join(" ", Enumerable.Range(1, 200).Select(i => $"word{i}"));
 
         // Act
-        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId);
+        var chunks = await _chunkingStrategy.ChunkAsync(text, documentId, Guid.NewGuid());
 
         // Assert
         for (int i = 0; i < chunks.Count; i++)

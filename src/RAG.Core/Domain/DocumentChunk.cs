@@ -41,6 +41,11 @@ public class DocumentChunk
     public Dictionary<string, object> Metadata { get; init; }
 
     /// <summary>
+    /// Tenant ID for multi-tenancy isolation.
+    /// </summary>
+    public Guid TenantId { get; init; }
+
+    /// <summary>
     /// Creates a new DocumentChunk instance with validation.
     /// </summary>
     public DocumentChunk(
@@ -50,12 +55,15 @@ public class DocumentChunk
         int startIndex,
         int endIndex,
         int chunkIndex,
+        Guid tenantId,
         Dictionary<string, object>? metadata = null)
     {
         if (string.IsNullOrEmpty(text))
             throw new ArgumentException("Text cannot be null or empty", nameof(text));
         if (documentId == Guid.Empty)
             throw new ArgumentException("DocumentId cannot be empty", nameof(documentId));
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("Tenant ID cannot be empty", nameof(tenantId));
         if (startIndex < 0)
             throw new ArgumentOutOfRangeException(nameof(startIndex), "StartIndex must be >= 0");
         if (endIndex <= startIndex)
@@ -67,6 +75,7 @@ public class DocumentChunk
         StartIndex = startIndex;
         EndIndex = endIndex;
         ChunkIndex = chunkIndex;
+        TenantId = tenantId;
         Metadata = metadata ?? new Dictionary<string, object>();
     }
 }
