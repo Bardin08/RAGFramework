@@ -181,6 +181,7 @@ try
     // Register individual text extractors (not as ITextExtractor to avoid circular dependency)
     builder.Services.AddScoped<RAG.Infrastructure.TextExtraction.TxtTextExtractor>();
     builder.Services.AddScoped<RAG.Infrastructure.TextExtraction.DocxTextExtractor>();
+    builder.Services.AddScoped<RAG.Infrastructure.TextExtraction.PdfTextExtractor>();
     // Register composite extractor as the ITextExtractor implementation
     builder.Services.AddScoped<ITextExtractor, RAG.Infrastructure.TextExtraction.CompositeTextExtractor>();
 

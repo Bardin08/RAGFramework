@@ -10,15 +10,18 @@ public class CompositeTextExtractor : ITextExtractor
 {
     private readonly TxtTextExtractor _txtExtractor;
     private readonly DocxTextExtractor _docxExtractor;
+    private readonly PdfTextExtractor _pdfExtractor;
     private readonly ILogger<CompositeTextExtractor> _logger;
 
     public CompositeTextExtractor(
         TxtTextExtractor txtExtractor,
         DocxTextExtractor docxExtractor,
+        PdfTextExtractor pdfExtractor,
         ILogger<CompositeTextExtractor> logger)
     {
         _txtExtractor = txtExtractor ?? throw new ArgumentNullException(nameof(txtExtractor));
         _docxExtractor = docxExtractor ?? throw new ArgumentNullException(nameof(docxExtractor));
+        _pdfExtractor = pdfExtractor ?? throw new ArgumentNullException(nameof(pdfExtractor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -35,7 +38,7 @@ public class CompositeTextExtractor : ITextExtractor
             var extension = Path.GetExtension(fileName);
             throw new NotSupportedException(
                 $"No text extractor found for file format: {extension}. " +
-                $"Supported formats: .txt, .docx");
+                $"Supported formats: .txt, .docx, .pdf");
         }
 
         _logger.LogDebug(
@@ -67,6 +70,7 @@ public class CompositeTextExtractor : ITextExtractor
         {
             ".txt" => _txtExtractor,
             ".docx" => _docxExtractor,
+            ".pdf" => _pdfExtractor,
             _ => null
         };
     }
