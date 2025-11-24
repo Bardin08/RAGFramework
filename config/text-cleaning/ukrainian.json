@@ -1,0 +1,34 @@
+{
+  "name": "ukrainian",
+  "description": "Ukrainian language-specific text cleaning rules",
+  "enabled": true,
+  "language": "uk",
+  "wordSpacing": {
+    "enabled": true,
+    "pattern": "([а-яіїєґА-ЯІЇЄҐ])([А-ЯІЇЄҐ][а-яіїєґ])",
+    "description": "Fix spacing between Ukrainian lowercase and uppercase letters"
+  },
+  "formArtifacts": [
+    "Підпис",
+    "підпис",
+    "(підпис)",
+    "Дата",
+    "дата",
+    "(дата)",
+    "На правах рукопису",
+    "УДК",
+    "До захисту допущено",
+    "ЗАТВЕРДЖУЮ",
+    "Завідувач кафедри",
+    "Примітка"
+  ],
+  "signaturePatterns": [
+    "(?:Прізвище|ім'я|по батькові|Посада|науковий ступінь|вчене звання)[_\\s,:]{5,}"
+  ],
+  "dateFieldPatterns": [
+    "«[_\\s]*»[_\\s]*[_\\s]*\\d{0,4}\\s*р\\.?"
+  ],
+  "formFieldPatterns": [
+    "^[\\s_]{10,}$"
+  ]
+}

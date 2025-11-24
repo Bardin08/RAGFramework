@@ -1,0 +1,25 @@
+{
+  "name": "academic-forms",
+  "description": "Academic forms and thesis documents cleaning rules",
+  "enabled": true,
+  "documentType": "academic",
+  "formArtifacts": [
+    "НАЦІОНАЛЬНИЙ ТЕХНІЧНИЙ УНІВЕРСИТЕТ УКРАЇНИ",
+    "КИЇВСЬКИЙ ПОЛІТЕХНІЧНИЙ ІНСТИТУТ",
+    "Факультет інформатики та обчислювальної техніки",
+    "Кафедра обчислювальної техніки",
+    "Магістерська дисертація",
+    "Звіт з практики",
+    "Засвідчую, що у цій магістерській дисертації немає запозичень",
+    "Студент _______________________"
+  ],
+  "headerFooterPatterns": [
+    "^Київ – \\d{4} року$",
+    "^\\d+$"
+  ],
+  "repetitiveContent": {
+    "enabled": true,
+    "threshold": 2,
+    "minimumLineLength": 30
+  }
+}

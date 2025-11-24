@@ -70,6 +70,8 @@ try
         builder.Configuration.GetSection("Chunking"));
     builder.Services.Configure<EmbeddingServiceOptions>(
         builder.Configuration.GetSection("EmbeddingService"));
+    builder.Services.Configure<TextCleaningSettings>(
+        builder.Configuration.GetSection("TextCleaning"));
 
     // Configure authentication
     if (builder.Environment.IsDevelopment())
@@ -181,6 +183,21 @@ try
     builder.Services.AddScoped<RAG.Infrastructure.TextExtraction.DocxTextExtractor>();
     // Register composite extractor as the ITextExtractor implementation
     builder.Services.AddScoped<ITextExtractor, RAG.Infrastructure.TextExtraction.CompositeTextExtractor>();
+
+    // Register text cleaning rules loader (singleton for caching)
+    builder.Services.AddSingleton<RAG.Application.TextProcessing.TextCleaningRulesLoader>();
+
+    // Register text cleaning strategies
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.UnicodeNormalizationStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.FormArtifactRemovalStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.WordSpacingFixStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.WhitespaceNormalizationStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.RepetitiveContentRemovalStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.TableFormattingCleanupStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.FinalCleanupStrategy>();
+
+    // Register configurable text cleaner
+    builder.Services.AddScoped<ITextCleanerService, RAG.Application.TextProcessing.ConfigurableTextCleaner>();
 
     builder.Services.AddScoped<IDocumentIndexingService, DocumentIndexingService>();
     builder.Services.AddScoped<IDocumentRepository, RAG.Infrastructure.Repositories.DocumentRepository>();

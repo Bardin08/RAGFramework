@@ -28,4 +28,11 @@
     <ProjectReference Include="..\RAG.Infrastructure\RAG.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\config\text-cleaning\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>config\text-cleaning\%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
 </Project>

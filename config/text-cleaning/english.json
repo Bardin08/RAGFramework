@@ -1,0 +1,31 @@
+{
+  "name": "english",
+  "description": "English language-specific text cleaning rules",
+  "enabled": true,
+  "language": "en",
+  "wordSpacing": {
+    "enabled": true,
+    "pattern": "([a-z])([A-Z][a-z])",
+    "description": "Fix spacing between English lowercase and uppercase letters"
+  },
+  "formArtifacts": [
+    "Signature",
+    "signature",
+    "(signature)",
+    "Date",
+    "date",
+    "(date)",
+    "Approved",
+    "APPROVED"
+  ],
+  "signaturePatterns": [
+    "(?:Name|Position|Title|Department)[_\\s,:]{5,}"
+  ],
+  "dateFieldPatterns": [
+    "__/__/____",
+    "\\d{0,2}/\\d{0,2}/\\d{0,4}"
+  ],
+  "formFieldPatterns": [
+    "^[\\s_]{10,}$"
+  ]
+}

@@ -6,12 +6,13 @@ using System.Diagnostics;
 namespace RAG.Application.Services;
 
 /// <summary>
-/// Orchestrates the full document indexing pipeline: extract → chunk → embed → index.
+/// Orchestrates the full document indexing pipeline: extract → clean → chunk → embed → index.
 /// </summary>
 public class DocumentIndexingService : IDocumentIndexingService
 {
     private readonly IDocumentStorageService _storageService;
     private readonly ITextExtractor _textExtractor;
+    private readonly ITextCleanerService _textCleaner;
     private readonly IChunkingStrategy _chunkingStrategy;
     private readonly IEmbeddingService _embeddingService;
     private readonly ISearchEngineClient _searchEngineClient;
@@ -24,6 +25,7 @@ public class DocumentIndexingService : IDocumentIndexingService
     public DocumentIndexingService(
         IDocumentStorageService storageService,
         ITextExtractor textExtractor,
+        ITextCleanerService textCleaner,
         IChunkingStrategy chunkingStrategy,
         IEmbeddingService embeddingService,
         ISearchEngineClient searchEngineClient,
@@ -33,6 +35,7 @@ public class DocumentIndexingService : IDocumentIndexingService
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
         _textExtractor = textExtractor ?? throw new ArgumentNullException(nameof(textExtractor));
+        _textCleaner = textCleaner ?? throw new ArgumentNullException(nameof(textCleaner));
         _chunkingStrategy = chunkingStrategy ?? throw new ArgumentNullException(nameof(chunkingStrategy));
         _embeddingService = embeddingService ?? throw new ArgumentNullException(nameof(embeddingService));
         _searchEngineClient = searchEngineClient ?? throw new ArgumentNullException(nameof(searchEngineClient));
@@ -66,20 +69,23 @@ public class DocumentIndexingService : IDocumentIndexingService
             // Step 1: Extract text from document
             var text = await ExtractTextAsync(documentId, tenantId, fileName, cancellationToken);
 
-            // Step 2: Chunk text into fragments
+            // Step 2: Clean and normalize text
+            text = CleanText(text, documentId);
+
+            // Step 3: Chunk text into fragments
             chunks = await ChunkTextAsync(text, documentId, tenantId, cancellationToken);
 
-            // Step 3: Generate embeddings for chunks
+            // Step 4: Generate embeddings for chunks
             var embeddings = await GenerateEmbeddingsAsync(chunks, cancellationToken);
 
-            // Step 4: Save Document and Chunks to PostgreSQL
+            // Step 5: Save Document and Chunks to PostgreSQL
             databaseSaved = await SaveToDatabase(
                 documentId, tenantId, title, source ?? fileName, text, chunks, cancellationToken);
 
-            // Step 5: Index chunks in Elasticsearch (with error handling)
+            // Step 6: Index chunks in Elasticsearch (with error handling)
             elasticsearchIndexed = await IndexInElasticsearchAsync(chunks, cancellationToken);
 
-            // Step 6: Index embeddings in Qdrant (with error handling)
+            // Step 7: Index embeddings in Qdrant (with error handling)
             qdrantIndexed = await IndexInQdrantAsync(chunks, embeddings, tenantId, cancellationToken);
 
             // Check if at least database save succeeded
@@ -161,7 +167,39 @@ public class DocumentIndexingService : IDocumentIndexingService
     }
 
     /// <summary>
-    /// Step 2: Chunk text into fragments.
+    /// Step 2: Clean and normalize extracted text.
+    /// </summary>
+    private string CleanText(string text, Guid documentId)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        _logger.LogDebug("Cleaning text for document {DocumentId}", documentId);
+
+        var cleanedText = _textCleaner.CleanText(text);
+
+        stopwatch.Stop();
+
+        _logger.LogInformation(
+            "Text cleaning completed for document {DocumentId}. " +
+            "Original: {OriginalLength} chars -> Cleaned: {CleanedLength} chars " +
+            "({ReductionPercent:F1}% reduction) in {ElapsedMs}ms",
+            documentId,
+            text.Length,
+            cleanedText.Length,
+            (1 - (double)cleanedText.Length / text.Length) * 100,
+            stopwatch.ElapsedMilliseconds);
+
+        if (string.IsNullOrWhiteSpace(cleanedText))
+        {
+            throw new InvalidOperationException(
+                $"Text cleaning resulted in empty content for document {documentId}");
+        }
+
+        return cleanedText;
+    }
+
+    /// <summary>
+    /// Step 3: Chunk text into fragments.
     /// </summary>
     private async Task<List<DocumentChunk>> ChunkTextAsync(
         string text,
@@ -192,7 +230,7 @@ public class DocumentIndexingService : IDocumentIndexingService
     }
 
     /// <summary>
-    /// Step 3: Generate embeddings for chunks in batches.
+    /// Step 4: Generate embeddings for chunks in batches.
     /// </summary>
     private async Task<List<float[]>> GenerateEmbeddingsAsync(
         List<DocumentChunk> chunks,
@@ -243,7 +281,7 @@ public class DocumentIndexingService : IDocumentIndexingService
     }
 
     /// <summary>
-    /// Step 4: Index chunks in Elasticsearch.
+    /// Step 6: Index chunks in Elasticsearch.
     /// </summary>
     private async Task<bool> IndexInElasticsearchAsync(
         List<DocumentChunk> chunks,
@@ -279,7 +317,7 @@ public class DocumentIndexingService : IDocumentIndexingService
     }
 
     /// <summary>
-    /// Step 5: Index embeddings in Qdrant.
+    /// Step 7: Index embeddings in Qdrant.
     /// </summary>
     private async Task<bool> IndexInQdrantAsync(
         List<DocumentChunk> chunks,
@@ -323,7 +361,7 @@ public class DocumentIndexingService : IDocumentIndexingService
     }
 
     /// <summary>
-    /// Step 4: Save Document and Chunks to PostgreSQL.
+    /// Step 5: Save Document and Chunks to PostgreSQL.
     /// </summary>
     private async Task<bool> SaveToDatabase(
         Guid documentId,
