@@ -33,6 +33,9 @@ WORKDIR /app
 # Copy published files
 COPY --from=publish /app/publish .
 
+# Copy config directory (text cleaning rules)
+COPY config/ ./config/
+
 # Set ownership
 RUN chown -R raguser:raguser /app
 
