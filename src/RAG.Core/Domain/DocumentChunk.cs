@@ -1,9 +1,9 @@
 namespace RAG.Core.Domain;
 
 /// <summary>
-/// Represents a chunk of a document with its embedding vector.
+/// Represents a chunk of text extracted from a document.
 /// </summary>
-public record DocumentChunk
+public class DocumentChunk
 {
     /// <summary>
     /// Unique identifier for the chunk.
@@ -11,58 +11,71 @@ public record DocumentChunk
     public Guid Id { get; init; }
 
     /// <summary>
-    /// The ID of the parent document.
+    /// Reference to the parent document.
     /// </summary>
     public Guid DocumentId { get; init; }
 
     /// <summary>
-    /// The text content of the chunk.
+    /// Text content of the chunk.
     /// </summary>
     public string Text { get; init; }
 
     /// <summary>
-    /// The vector embedding of the chunk (typically 384 or 768 dimensions).
-    /// </summary>
-    public float[] Embedding { get; init; }
-
-    /// <summary>
-    /// The starting character position in the original document.
+    /// Character position where chunk starts in original document (0-based).
     /// </summary>
     public int StartIndex { get; init; }
 
     /// <summary>
-    /// The ending character position in the original document.
+    /// Character position where chunk ends in original document (exclusive).
     /// </summary>
     public int EndIndex { get; init; }
 
     /// <summary>
+    /// Sequential index of chunk within document (0-based).
+    /// </summary>
+    public int ChunkIndex { get; init; }
+
+    /// <summary>
+    /// Additional metadata about the chunk (e.g., token count, chunking strategy).
+    /// </summary>
+    public Dictionary<string, object> Metadata { get; init; }
+
+    /// <summary>
+    /// Tenant ID for multi-tenancy isolation.
+    /// </summary>
+    public Guid TenantId { get; init; }
+
+    /// <summary>
     /// Creates a new DocumentChunk instance with validation.
     /// </summary>
-    public DocumentChunk(Guid id, Guid documentId, string text, float[] embedding, int startIndex, int endIndex)
+    public DocumentChunk(
+        Guid id,
+        Guid documentId,
+        string text,
+        int startIndex,
+        int endIndex,
+        int chunkIndex,
+        Guid tenantId,
+        Dictionary<string, object>? metadata = null)
     {
-        if (id == Guid.Empty)
-            throw new ArgumentException("Chunk ID cannot be empty", nameof(id));
-
+        if (string.IsNullOrEmpty(text))
+            throw new ArgumentException("Text cannot be null or empty", nameof(text));
         if (documentId == Guid.Empty)
-            throw new ArgumentException("Document ID cannot be empty", nameof(documentId));
-
-        if (string.IsNullOrWhiteSpace(text))
-            throw new ArgumentException("Chunk text cannot be empty", nameof(text));
-
-        if (embedding == null || embedding.Length == 0)
-            throw new ArgumentException("Embedding cannot be null or empty", nameof(embedding));
-
+            throw new ArgumentException("DocumentId cannot be empty", nameof(documentId));
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("Tenant ID cannot be empty", nameof(tenantId));
         if (startIndex < 0)
-            throw new ArgumentException("StartIndex cannot be negative", nameof(startIndex));
-
+            throw new ArgumentOutOfRangeException(nameof(startIndex), "StartIndex must be >= 0");
         if (endIndex <= startIndex)
-            throw new ArgumentException("EndIndex must be greater than StartIndex", nameof(endIndex));
+            throw new ArgumentOutOfRangeException(nameof(endIndex), "EndIndex must be > StartIndex");
 
-        Id = id;
+        Id = id == Guid.Empty ? Guid.NewGuid() : id;
         DocumentId = documentId;
         Text = text;
-        Embedding = embedding;
         StartIndex = startIndex;
         EndIndex = endIndex;
+        ChunkIndex = chunkIndex;
+        TenantId = tenantId;
+        Metadata = metadata ?? new Dictionary<string, object>();
     }
 }

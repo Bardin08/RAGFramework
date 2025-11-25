@@ -131,7 +131,7 @@ public class FileUploadService(
         Guid tenantId;
         try
         {
-            tenantId = tenantContext.GetCurrentTenantId();
+            tenantId = tenantContext.GetTenantId();
         }
         catch (InvalidOperationException ex)
         {

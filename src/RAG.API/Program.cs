@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Minio;
+using Polly;
 using RAG.API.Authentication;
 using RAG.API.Filters;
 using RAG.API.Middleware;
@@ -9,6 +10,7 @@ using RAG.Application.Interfaces;
 using RAG.Application.Services;
 using RAG.Core.Configuration;
 using RAG.Infrastructure.Data;
+using RAG.Infrastructure.Middleware;
 using RAG.Infrastructure.Repositories;
 using RAG.Infrastructure.Services;
 using RAG.Infrastructure.Storage;
@@ -64,6 +66,12 @@ try
         builder.Configuration.GetSection("Keycloak"));
     builder.Services.Configure<MinIOSettings>(
         builder.Configuration.GetSection("MinIO"));
+    builder.Services.Configure<ChunkingOptions>(
+        builder.Configuration.GetSection("Chunking"));
+    builder.Services.Configure<EmbeddingServiceOptions>(
+        builder.Configuration.GetSection("EmbeddingService"));
+    builder.Services.Configure<TextCleaningSettings>(
+        builder.Configuration.GetSection("TextCleaning"));
 
     // Configure authentication
     if (builder.Environment.IsDevelopment())
@@ -137,8 +145,13 @@ try
         });
     });
 
+    // Configure Npgsql to support dynamic JSON serialization
+    var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("DefaultConnection"));
+    dataSourceBuilder.EnableDynamicJson();
+    var dataSource = dataSourceBuilder.Build();
+
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+        options.UseNpgsql(dataSource));
 
     // Register MinIO SDK client
     builder.Services.AddSingleton<IMinioClient>(sp =>
@@ -161,10 +174,62 @@ try
     builder.Services.AddScoped<IDocumentStorageService, MinIODocumentStorageService>();
     builder.Services.AddSingleton<IHashService, Sha256HashService>();
     builder.Services.AddScoped<IDocumentHashRepository, DocumentHashRepository>();
+    builder.Services.AddScoped<IChunkingStrategy, RAG.Infrastructure.Chunking.SlidingWindowChunker>();
+    builder.Services.AddScoped<ISearchEngineClient, RAG.Infrastructure.SearchEngines.ElasticsearchClient>();
+    builder.Services.AddScoped<IVectorStoreClient, RAG.Infrastructure.VectorStores.QdrantClient>();
+
+    // Register individual text extractors (not as ITextExtractor to avoid circular dependency)
+    builder.Services.AddScoped<RAG.Infrastructure.TextExtraction.TxtTextExtractor>();
+    builder.Services.AddScoped<RAG.Infrastructure.TextExtraction.DocxTextExtractor>();
+    builder.Services.AddScoped<RAG.Infrastructure.TextExtraction.PdfTextExtractor>();
+    // Register composite extractor as the ITextExtractor implementation
+    builder.Services.AddScoped<ITextExtractor, RAG.Infrastructure.TextExtraction.CompositeTextExtractor>();
+
+    // Register text cleaning rules loader (singleton for caching)
+    builder.Services.AddSingleton<RAG.Application.TextProcessing.TextCleaningRulesLoader>();
+
+    // Register text cleaning strategies
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.UnicodeNormalizationStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.FormArtifactRemovalStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.WordSpacingFixStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.WhitespaceNormalizationStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.RepetitiveContentRemovalStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.TableFormattingCleanupStrategy>();
+    builder.Services.AddScoped<ITextCleaningStrategy, RAG.Application.TextProcessing.Strategies.FinalCleanupStrategy>();
+
+    // Register configurable text cleaner
+    builder.Services.AddScoped<ITextCleanerService, RAG.Application.TextProcessing.ConfigurableTextCleaner>();
+
+    builder.Services.AddScoped<IDocumentIndexingService, DocumentIndexingService>();
+    builder.Services.AddScoped<IDocumentRepository, RAG.Infrastructure.Repositories.DocumentRepository>();
+    builder.Services.AddScoped<IDocumentDeletionService, DocumentDeletionService>();
     builder.Services.AddHttpContextAccessor();
 
+    // Register embedding service client with HttpClientFactory and Polly retry policies
+    builder.Services.AddHttpClient<IEmbeddingService, RAG.Infrastructure.Clients.EmbeddingServiceClient>((sp, client) =>
+    {
+        var options = sp.GetRequiredService<IOptions<EmbeddingServiceOptions>>().Value;
+        client.BaseAddress = new Uri(options.ServiceUrl);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+    })
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = 3;
+        options.Retry.Delay = TimeSpan.FromSeconds(1);
+        options.Retry.BackoffType = Polly.DelayBackoffType.Exponential;
+        options.Retry.UseJitter = true;
+        options.Retry.OnRetry = args =>
+        {
+            Log.Warning(
+                "Retry {RetryCount} for embedding service after {Delay}s due to {Exception}",
+                args.AttemptNumber,
+                args.RetryDelay.TotalSeconds,
+                args.Outcome.Exception?.Message ?? "transient HTTP error");
+            return ValueTask.CompletedTask;
+        };
+    });
+
     // Register health check service
-    builder.Services.AddHttpClient();
     builder.Services.AddMemoryCache();
     builder.Services.AddScoped<IHealthCheckService, HealthCheckService>();
 
@@ -203,6 +268,7 @@ try
     }
 
     app.UseAuthentication();
+    app.UseTenantContext();
     app.UseAuthorization();
 
     app.MapControllers();

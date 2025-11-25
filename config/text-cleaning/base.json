@@ -1,0 +1,29 @@
+{
+  "name": "base",
+  "description": "Base text cleaning rules - language-agnostic",
+  "enabled": true,
+  "strategies": {
+    "unicodeNormalization": {
+      "enabled": true,
+      "normalizeSpaces": true,
+      "normalizeQuotes": true,
+      "normalizeDashes": true
+    },
+    "whitespaceNormalization": {
+      "enabled": true,
+      "removeExcessiveSpaces": true,
+      "removeExcessiveLineBreaks": true,
+      "maxConsecutiveBlankLines": 2
+    },
+    "tableFormatting": {
+      "enabled": true,
+      "convertSeparators": true,
+      "separatorReplacement": ", "
+    },
+    "repetitiveContent": {
+      "enabled": true,
+      "threshold": 3,
+      "minimumLineLength": 20
+    }
+  }
+}

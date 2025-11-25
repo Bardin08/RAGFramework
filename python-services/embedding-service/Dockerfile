@@ -18,8 +18,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY app/ ./app/
 
-# Set ownership
-RUN chown -R embeddinguser:embeddinguser /app
+# Create cache directory and set ownership
+RUN mkdir -p /app/.cache && \
+    chown -R embeddinguser:embeddinguser /app
 
 # Switch to non-root user
 USER embeddinguser
@@ -33,6 +34,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
+ENV TRANSFORMERS_CACHE=/app/.cache
+ENV HF_HOME=/app/.cache
 
 # Run uvicorn
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

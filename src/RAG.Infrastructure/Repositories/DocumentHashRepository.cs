@@ -61,6 +61,21 @@ public class DocumentHashRepository(ApplicationDbContext context) : IDocumentHas
             .AnyAsync(dh => dh.Hash == hash && dh.TenantId == tenantId, cancellationToken);
     }
 
+    /// <summary>
+    /// Deletes a document hash record by document ID.
+    /// </summary>
+    public async Task DeleteByDocumentIdAsync(Guid documentId, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var documentHash = await _context.DocumentHashes
+            .FirstOrDefaultAsync(dh => dh.DocumentId == documentId && dh.TenantId == tenantId, cancellationToken);
+
+        if (documentHash != null)
+        {
+            _context.DocumentHashes.Remove(documentHash);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)
     {
         // PostgreSQL unique constraint violation error code

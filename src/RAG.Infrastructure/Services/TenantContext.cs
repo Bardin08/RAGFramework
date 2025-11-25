@@ -4,23 +4,63 @@ using RAG.Application.Interfaces;
 namespace RAG.Infrastructure.Services;
 
 /// <summary>
-/// Implementation of tenant context service that extracts tenant information from JWT claims.
+/// Provides access to the current tenant context extracted from HTTP context.
 /// </summary>
-public class TenantContext(IHttpContextAccessor httpContextAccessor) : ITenantContext
+public class TenantContext : ITenantContext
 {
-    /// <inheritdoc />
-    public Guid GetCurrentTenantId()
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private const string TenantIdClaimType = "tenant_id";
+    private const string GlobalAdminClaimType = "admin:global";
+
+    public TenantContext(IHttpContextAccessor httpContextAccessor)
     {
-        var httpContext = httpContextAccessor.HttpContext;
-        if (httpContext == null)
-            throw new InvalidOperationException("HTTP context is not available");
+        _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+    }
 
-        var tenantIdClaim = httpContext.User.FindFirst("tenant_id")?.Value;
-        if (string.IsNullOrEmpty(tenantIdClaim))
-            throw new InvalidOperationException("Tenant ID claim is missing from JWT token");
+    /// <inheritdoc />
+    public Guid GetTenantId()
+    {
+        if (!TryGetTenantId(out var tenantId))
+        {
+            throw new InvalidOperationException(
+                "Tenant context is not available. Ensure the request contains a valid tenant_id claim.");
+        }
 
-        return Guid.TryParse(tenantIdClaim, out var tenantId)
-            ? tenantId
-            : throw new InvalidOperationException($"Invalid tenant ID format: {tenantIdClaim}");
+        return tenantId;
+    }
+
+    /// <inheritdoc />
+    public bool TryGetTenantId(out Guid tenantId)
+    {
+        tenantId = Guid.Empty;
+
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext?.User?.Identity?.IsAuthenticated != true)
+        {
+            return false;
+        }
+
+        var tenantIdClaim = httpContext.User.FindFirst(TenantIdClaimType);
+        if (tenantIdClaim == null)
+        {
+            return false;
+        }
+
+        return Guid.TryParse(tenantIdClaim.Value, out tenantId) && tenantId != Guid.Empty;
+    }
+
+    /// <inheritdoc />
+    public bool IsGlobalAdmin
+    {
+        get
+        {
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext?.User?.Identity?.IsAuthenticated != true)
+            {
+                return false;
+            }
+
+            return httpContext.User.HasClaim(c => c.Type == GlobalAdminClaimType);
+        }
     }
 }
