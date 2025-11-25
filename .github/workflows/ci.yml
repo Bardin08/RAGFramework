@@ -77,9 +77,10 @@ jobs:
           - name: api
             context: .
             dockerfile: ./src/RAG.API/Dockerfile
-          - name: embedding
-            context: ./python-services/embedding-service
-            dockerfile: ./python-services/embedding-service/Dockerfile
+          # DISABLED: Embedding service image is ~3GB and takes too long to build
+          # - name: embedding
+          #   context: ./python-services/embedding-service
+          #   dockerfile: ./python-services/embedding-service/Dockerfile
           - name: migrations
             context: .
             dockerfile: ./src/RAG.Infrastructure/Migrations.Dockerfile
