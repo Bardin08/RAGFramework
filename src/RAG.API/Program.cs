@@ -12,6 +12,7 @@ using RAG.Core.Configuration;
 using RAG.Infrastructure.Data;
 using RAG.Infrastructure.Middleware;
 using RAG.Infrastructure.Repositories;
+using RAG.Infrastructure.Retrievers;
 using RAG.Infrastructure.Services;
 using RAG.Infrastructure.Storage;
 using Serilog;
@@ -72,6 +73,10 @@ try
         builder.Configuration.GetSection("EmbeddingService"));
     builder.Services.Configure<TextCleaningSettings>(
         builder.Configuration.GetSection("TextCleaning"));
+    builder.Services.Configure<BM25Settings>(
+        builder.Configuration.GetSection("BM25Settings"));
+    builder.Services.Configure<DenseSettings>(
+        builder.Configuration.GetSection("DenseSettings"));
 
     // Configure authentication
     if (builder.Environment.IsDevelopment())
@@ -168,6 +173,9 @@ try
     builder.Services.AddScoped<IMinIOClient, MinIOClient>();
 
     // Register application services
+    builder.Services.AddScoped<IQueryProcessor, QueryProcessor>();
+    builder.Services.AddScoped<IRetriever, BM25Retriever>();
+    builder.Services.AddScoped<DenseRetriever>(); // Registered directly (not as IRetriever) until factory pattern in Story 3.4
     builder.Services.AddScoped<IFileValidationService, FileValidationService>();
     builder.Services.AddScoped<ITenantContext, TenantContext>();
     builder.Services.AddScoped<IFileUploadService, FileUploadService>();
