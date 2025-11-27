@@ -2,10 +2,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using RAG.Core.Configuration;
-using RAG.Core.Domain;
 using RAG.Infrastructure.Chunking;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Chunking;
 

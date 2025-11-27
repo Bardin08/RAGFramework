@@ -1,7 +1,6 @@
 using RAG.Core.Domain;
 using RAG.Core.Domain.Enums;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Domain;
 

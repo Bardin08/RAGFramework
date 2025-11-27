@@ -3,7 +3,6 @@ using Microsoft.Extensions.Options;
 using Moq;
 using RAG.Application.Interfaces;
 using RAG.Core.Configuration;
-using RAG.Core.Domain;
 using RAG.Infrastructure.Retrievers;
 using Shouldly;
 

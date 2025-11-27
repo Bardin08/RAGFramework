@@ -1,12 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RAG.Application.Interfaces;
 using RAG.Core.Configuration;
-using RAG.Core.Domain;
 using RAG.Infrastructure.Chunking;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Integration.Chunking;
 

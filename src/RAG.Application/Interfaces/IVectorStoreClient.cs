@@ -1,5 +1,3 @@
-using RAG.Core.Domain;
-
 namespace RAG.Application.Interfaces;
 
 /// <summary>

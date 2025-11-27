@@ -5,7 +5,6 @@ using RAG.Application.Interfaces;
 using RAG.Core.Configuration;
 using RAG.Infrastructure.Clients;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Integration.Clients;
 

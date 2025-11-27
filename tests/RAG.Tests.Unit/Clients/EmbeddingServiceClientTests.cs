@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,7 +8,6 @@ using RAG.Core.Configuration;
 using RAG.Core.Domain;
 using RAG.Infrastructure.Clients;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Clients;
 

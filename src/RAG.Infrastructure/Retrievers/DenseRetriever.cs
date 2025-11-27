@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using RAG.Application.Interfaces;
 using RAG.Core.Configuration;
 using RAG.Core.Domain;
+using RAG.Core.Enums;
 
 namespace RAG.Infrastructure.Retrievers;
 
@@ -10,7 +11,7 @@ namespace RAG.Infrastructure.Retrievers;
 /// Dense retrieval implementation using vector similarity search via Qdrant.
 /// Provides semantic search capabilities with embedding-based document retrieval.
 /// </summary>
-public class DenseRetriever : IRetriever
+public class DenseRetriever : IRetrievalStrategy
 {
     private readonly IEmbeddingService _embeddingService;
     private readonly IVectorStoreClient _vectorStoreClient;
@@ -191,4 +192,10 @@ public class DenseRetriever : IRetriever
         // -1 (opposite) → 0, 0 (orthogonal) → 0.5, 1 (identical) → 1
         return (cosineSimilarity + 1.0) / 2.0;
     }
+
+    /// <inheritdoc />
+    public string GetStrategyName() => "Dense";
+
+    /// <inheritdoc />
+    public RetrievalStrategyType StrategyType => RetrievalStrategyType.Dense;
 }

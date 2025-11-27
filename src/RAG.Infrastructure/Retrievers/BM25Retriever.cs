@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using RAG.Application.Interfaces;
 using RAG.Core.Configuration;
 using RAG.Core.Domain;
+using RAG.Core.Enums;
 
 namespace RAG.Infrastructure.Retrievers;
 
@@ -13,7 +14,7 @@ namespace RAG.Infrastructure.Retrievers;
 /// BM25-based document retrieval using Elasticsearch.
 /// Provides keyword-based search with query highlighting.
 /// </summary>
-public class BM25Retriever : IRetriever
+public class BM25Retriever : IRetrievalStrategy
 {
     private readonly ElasticsearchClient _client;
     private readonly BM25Settings _settings;
@@ -171,4 +172,10 @@ public class BM25Retriever : IRetriever
             throw new InvalidOperationException($"Search operation failed: {ex.Message}", ex);
         }
     }
+
+    /// <inheritdoc />
+    public string GetStrategyName() => "BM25";
+
+    /// <inheritdoc />
+    public RetrievalStrategyType StrategyType => RetrievalStrategyType.BM25;
 }
