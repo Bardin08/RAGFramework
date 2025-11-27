@@ -38,6 +38,12 @@ public class BM25Retriever : IRetrievalStrategy
         var clientSettings = new ElasticsearchClientSettings(new Uri(_elasticsearchSettings.Url))
             .RequestTimeout(TimeSpan.FromSeconds(_settings.TimeoutSeconds));
 
+        // Disable SSL certificate validation for HTTPS connections (for development/testing with self-signed certs)
+        if (_elasticsearchSettings.Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            clientSettings = clientSettings.ServerCertificateValidationCallback((sender, certificate, chain, sslPolicyErrors) => true);
+        }
+
         if (!string.IsNullOrWhiteSpace(_elasticsearchSettings.Username) && !string.IsNullOrWhiteSpace(_elasticsearchSettings.Password))
         {
             clientSettings = clientSettings.Authentication(new BasicAuthentication(_elasticsearchSettings.Username, _elasticsearchSettings.Password));

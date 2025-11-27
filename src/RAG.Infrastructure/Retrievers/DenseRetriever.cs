@@ -190,7 +190,10 @@ public class DenseRetriever : IRetrievalStrategy
     {
         // Convert cosine similarity [-1, 1] → [0, 1]
         // -1 (opposite) → 0, 0 (orthogonal) → 0.5, 1 (identical) → 1
-        return (cosineSimilarity + 1.0) / 2.0;
+        var normalized = (cosineSimilarity + 1.0) / 2.0;
+
+        // Clamp to [0, 1] to handle floating-point precision errors
+        return Math.Clamp(normalized, 0.0, 1.0);
     }
 
     /// <inheritdoc />
