@@ -1,7 +1,6 @@
 using System.Text;
 using RAG.Infrastructure.Services;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Services;
 

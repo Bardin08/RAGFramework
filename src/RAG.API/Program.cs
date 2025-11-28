@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Minio;
-using Polly;
 using RAG.API.Authentication;
 using RAG.API.Filters;
 using RAG.API.Middleware;
@@ -12,6 +11,7 @@ using RAG.Core.Configuration;
 using RAG.Infrastructure.Data;
 using RAG.Infrastructure.Middleware;
 using RAG.Infrastructure.Repositories;
+using RAG.Infrastructure.Retrievers;
 using RAG.Infrastructure.Services;
 using RAG.Infrastructure.Storage;
 using Serilog;
@@ -20,7 +20,7 @@ using Serilog.Events;
 // Build initial configuration to read appsettings
 var configuration = new ConfigurationBuilder()
     .SetBasePath(Directory.GetCurrentDirectory())
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)  // Optional for testing
     .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables()
     .Build();
@@ -72,6 +72,12 @@ try
         builder.Configuration.GetSection("EmbeddingService"));
     builder.Services.Configure<TextCleaningSettings>(
         builder.Configuration.GetSection("TextCleaning"));
+    builder.Services.Configure<BM25Settings>(
+        builder.Configuration.GetSection("BM25Settings"));
+    builder.Services.Configure<DenseSettings>(
+        builder.Configuration.GetSection("DenseSettings"));
+    builder.Services.Configure<RetrievalSettings>(
+        builder.Configuration.GetSection("RetrievalSettings"));
 
     // Configure authentication
     if (builder.Environment.IsDevelopment())
@@ -168,6 +174,10 @@ try
     builder.Services.AddScoped<IMinIOClient, MinIOClient>();
 
     // Register application services
+    builder.Services.AddScoped<IQueryProcessor, QueryProcessor>();
+    builder.Services.AddScoped<BM25Retriever>(); // Registered as concrete class for factory pattern (Story 3.4)
+    builder.Services.AddScoped<DenseRetriever>(); // Registered as concrete class for factory pattern (Story 3.4)
+    builder.Services.AddScoped<RAG.Infrastructure.Factories.RetrievalStrategyFactory>(); // Factory for retrieval strategies (Story 3.4)
     builder.Services.AddScoped<IFileValidationService, FileValidationService>();
     builder.Services.AddScoped<ITenantContext, TenantContext>();
     builder.Services.AddScoped<IFileUploadService, FileUploadService>();
@@ -272,6 +282,36 @@ try
     app.UseAuthorization();
 
     app.MapControllers();
+
+    // Initialize Elasticsearch index and Qdrant collection on startup
+    using (var scope = app.Services.CreateScope())
+    {
+        var services = scope.ServiceProvider;
+
+        try
+        {
+            Log.Information("Initializing Elasticsearch index...");
+            var searchEngineClient = services.GetRequiredService<ISearchEngineClient>();
+            await searchEngineClient.InitializeIndexAsync();
+            Log.Information("Elasticsearch index initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to initialize Elasticsearch index");
+        }
+
+        try
+        {
+            Log.Information("Initializing Qdrant collection...");
+            var vectorStoreClient = services.GetRequiredService<IVectorStoreClient>();
+            await vectorStoreClient.InitializeCollectionAsync();
+            Log.Information("Qdrant collection initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to initialize Qdrant collection");
+        }
+    }
 
     app.Run();
     Log.Information("Application stopped cleanly");

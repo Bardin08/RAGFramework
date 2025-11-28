@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using RAG.Core.Domain;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Integration;
 

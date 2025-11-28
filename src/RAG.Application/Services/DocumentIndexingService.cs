@@ -86,7 +86,7 @@ public class DocumentIndexingService : IDocumentIndexingService
             elasticsearchIndexed = await IndexInElasticsearchAsync(chunks, cancellationToken);
 
             // Step 7: Index embeddings in Qdrant (with error handling)
-            qdrantIndexed = await IndexInQdrantAsync(chunks, embeddings, tenantId, cancellationToken);
+            qdrantIndexed = await IndexInQdrantAsync(chunks, embeddings, tenantId, source ?? fileName, cancellationToken);
 
             // Check if at least database save succeeded
             if (!databaseSaved)
@@ -323,6 +323,7 @@ public class DocumentIndexingService : IDocumentIndexingService
         List<DocumentChunk> chunks,
         List<float[]> embeddings,
         Guid tenantId,
+        string source,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -334,7 +335,7 @@ public class DocumentIndexingService : IDocumentIndexingService
             var vectors = chunks.Zip(embeddings, (chunk, embedding) => (
                 Id: chunk.Id,
                 Embedding: embedding,
-                Payload: CreateQdrantPayload(chunk, tenantId)
+                Payload: CreateQdrantPayload(chunk, tenantId, source)
             )).ToList();
 
             await _vectorStoreClient.BatchUpsertAsync(vectors, cancellationToken);
@@ -422,13 +423,14 @@ public class DocumentIndexingService : IDocumentIndexingService
     /// <summary>
     /// Creates payload for Qdrant vector storage.
     /// </summary>
-    private static Dictionary<string, object> CreateQdrantPayload(DocumentChunk chunk, Guid tenantId)
+    private static Dictionary<string, object> CreateQdrantPayload(DocumentChunk chunk, Guid tenantId, string source)
     {
         var payload = new Dictionary<string, object>
         {
             ["documentId"] = chunk.DocumentId,
             ["tenantId"] = tenantId,
             ["text"] = chunk.Text,
+            ["source"] = source,
             ["startIndex"] = chunk.StartIndex,
             ["endIndex"] = chunk.EndIndex,
             ["chunkIndex"] = chunk.ChunkIndex

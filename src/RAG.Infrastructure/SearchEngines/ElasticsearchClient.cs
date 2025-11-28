@@ -1,7 +1,4 @@
 using Elastic.Clients.Elasticsearch;
-using Elastic.Clients.Elasticsearch.Core.Bulk;
-using Elastic.Clients.Elasticsearch.IndexManagement;
-using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Transport;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -32,7 +29,13 @@ public class ElasticsearchClient : ISearchEngineClient
 
         // Configure Elasticsearch client
         var clientSettings = new ElasticsearchClientSettings(new Uri(_settings.Url));
-        
+
+        // Disable SSL certificate validation for HTTPS connections (for development/testing with self-signed certs)
+        if (_settings.Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            clientSettings = clientSettings.ServerCertificateValidationCallback((sender, certificate, chain, sslPolicyErrors) => true);
+        }
+
         if (!string.IsNullOrWhiteSpace(_settings.Username) && !string.IsNullOrWhiteSpace(_settings.Password))
         {
             clientSettings = clientSettings.Authentication(new BasicAuthentication(_settings.Username, _settings.Password));

@@ -16,6 +16,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="Shouldly" Version="4.3.0" />
+    <PackageReference Include="Testcontainers" Version="3.10.0" />
+    <PackageReference Include="Testcontainers.Elasticsearch" Version="3.10.0" />
     <PackageReference Include="xunit" Version="2.5.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
   </ItemGroup>
@@ -29,6 +31,12 @@
     <ProjectReference Include="..\..\src\RAG.Application\RAG.Application.csproj" />
     <ProjectReference Include="..\..\src\RAG.Infrastructure\RAG.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\RAG.API\RAG.API.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copy appsettings.json from API project for WebApplicationFactory tests -->
+    <Content Include="..\..\src\RAG.API\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\RAG.API\appsettings.Development.json" Link="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
