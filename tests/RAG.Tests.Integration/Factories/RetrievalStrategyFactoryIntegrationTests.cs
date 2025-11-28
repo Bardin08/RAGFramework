@@ -91,6 +91,9 @@ public class RetrievalStrategyFactoryIntegrationTests : IDisposable
         var mockRRFReranker = new Mock<IRRFReranker>();
         services.AddScoped<IRRFReranker>(_ => mockRRFReranker.Object);
 
+        var mockQueryClassifier = new Mock<IQueryClassifier>();
+        services.AddScoped<IQueryClassifier>(_ => mockQueryClassifier.Object);
+
         // Register retrievers as concrete classes (required for factory pattern)
         services.AddScoped<BM25Retriever>();
         services.AddScoped<DenseRetriever>();
@@ -102,6 +105,15 @@ public class RetrievalStrategyFactoryIntegrationTests : IDisposable
             var config = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HybridSearchConfig>>();
             var logger = sp.GetRequiredService<ILogger<HybridRetriever>>();
             return new HybridRetriever(bm25, dense, rrfReranker, config, logger);
+        });
+        services.AddScoped<AdaptiveRetriever>(sp =>
+        {
+            var queryClassifier = sp.GetRequiredService<IQueryClassifier>();
+            var bm25 = sp.GetRequiredService<BM25Retriever>();
+            var dense = sp.GetRequiredService<DenseRetriever>();
+            var hybrid = sp.GetRequiredService<HybridRetriever>();
+            var logger = sp.GetRequiredService<ILogger<AdaptiveRetriever>>();
+            return new AdaptiveRetriever(queryClassifier, bm25, dense, hybrid, logger);
         });
 
         // Register factory
@@ -159,6 +171,23 @@ public class RetrievalStrategyFactoryIntegrationTests : IDisposable
         strategy.ShouldBeAssignableTo<IRetrievalStrategy>();
         strategy.GetStrategyName().ShouldBe("Hybrid");
         strategy.StrategyType.ShouldBe(RetrievalStrategyType.Hybrid);
+    }
+
+    [Fact]
+    public void Factory_WithRealDI_CreatesAdaptiveRetriever()
+    {
+        // Arrange
+        var factory = _serviceProvider.GetRequiredService<RetrievalStrategyFactory>();
+
+        // Act
+        var strategy = factory.CreateStrategy(RetrievalStrategyType.Adaptive);
+
+        // Assert
+        strategy.ShouldNotBeNull();
+        strategy.ShouldBeOfType<AdaptiveRetriever>();
+        strategy.ShouldBeAssignableTo<IRetrievalStrategy>();
+        strategy.GetStrategyName().ShouldBe("Adaptive");
+        strategy.StrategyType.ShouldBe(RetrievalStrategyType.Adaptive);
     }
 
     [Fact]

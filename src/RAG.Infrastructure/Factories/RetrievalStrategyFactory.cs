@@ -38,6 +38,7 @@ public class RetrievalStrategyFactory
             RetrievalStrategyType.BM25 => _serviceProvider.GetRequiredService<BM25Retriever>(),
             RetrievalStrategyType.Dense => _serviceProvider.GetRequiredService<DenseRetriever>(),
             RetrievalStrategyType.Hybrid => _serviceProvider.GetRequiredService<HybridRetriever>(),
+            RetrievalStrategyType.Adaptive => _serviceProvider.GetRequiredService<AdaptiveRetriever>(),
             _ => throw new ArgumentException($"Unknown retrieval strategy type: {type}", nameof(type))
         };
 

@@ -22,5 +22,11 @@ public enum RetrievalStrategyType
     /// Provides balanced results using both keyword and semantic matching.
     /// Reserved for future implementation (Epic 4).
     /// </summary>
-    Hybrid = 3
+    Hybrid = 3,
+
+    /// <summary>
+    /// Adaptive retrieval that selects optimal strategy based on query classification.
+    /// Routes queries to BM25, Dense, or Hybrid based on QueryType analysis.
+    /// </summary>
+    Adaptive = 4
 }
