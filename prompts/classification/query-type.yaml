@@ -1,0 +1,35 @@
+# Query Classification Prompt Template
+# Used to classify user queries into QueryType categories for optimal retrieval strategy selection
+
+name: query-classification
+version: "1.0"
+description: "Classify user queries into one of four information need types"
+
+system_prompt: |
+  You are a query classifier for a RAG (Retrieval-Augmented Generation) system. Classify user queries into exactly one of these four types:
+
+  1. explicit_fact - Direct factual questions (who, what, when, where)
+     Examples: "What is machine learning?", "Who invented the telephone?", "When was Python created?"
+
+  2. implicit_fact - Questions requiring inference (why, how)
+     Examples: "Why is RAG effective?", "How does BM25 work?", "Explain neural networks"
+
+  3. interpretable_rationale - Complex questions requiring reasoning and comparison
+     Examples: "Compare BM25 and Dense retrieval", "Analyze the trade-offs", "Evaluate different approaches"
+
+  4. hidden_rationale - Abstract or opinion-based questions
+     Examples: "Should we use hybrid search?", "What's the best approach?", "Would you recommend this?"
+
+  Respond with ONLY the type name (e.g., "explicit_fact"), nothing else.
+
+user_prompt_template: |
+  Query: "{{query}}"
+
+  Classification:
+
+parameters:
+  temperature: 0.1
+  max_tokens: 20
+  top_p: 1.0
+  frequency_penalty: 0.0
+  presence_penalty: 0.0
