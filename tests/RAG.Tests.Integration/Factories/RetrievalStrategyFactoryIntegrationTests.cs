@@ -56,7 +56,12 @@ public class RetrievalStrategyFactoryIntegrationTests : IDisposable
                 // Retrieval Settings
                 ["RetrievalSettings:DefaultStrategy"] = "Dense",
                 ["RetrievalSettings:EnableStrategyFallback"] = "true",
-                ["RetrievalSettings:FallbackStrategy"] = "BM25"
+                ["RetrievalSettings:FallbackStrategy"] = "BM25",
+
+                // Hybrid Search Settings
+                ["HybridSearch:Alpha"] = "0.5",
+                ["HybridSearch:Beta"] = "0.5",
+                ["HybridSearch:IntermediateK"] = "20"
             })
             .Build();
 
@@ -72,6 +77,7 @@ public class RetrievalStrategyFactoryIntegrationTests : IDisposable
         services.Configure<ElasticsearchSettings>(configuration.GetSection("ElasticsearchSettings"));
         services.Configure<QdrantSettings>(configuration.GetSection("QdrantSettings"));
         services.Configure<RetrievalSettings>(configuration.GetSection("RetrievalSettings"));
+        services.Configure<HybridSearchConfig>(configuration.GetSection("HybridSearch"));
 
         // Register mocked dependencies for retrievers
         var mockEmbeddingService = new Mock<IEmbeddingService>();
@@ -83,6 +89,14 @@ public class RetrievalStrategyFactoryIntegrationTests : IDisposable
         // Register retrievers as concrete classes (required for factory pattern)
         services.AddScoped<BM25Retriever>();
         services.AddScoped<DenseRetriever>();
+        services.AddScoped<HybridRetriever>(sp =>
+        {
+            var bm25 = sp.GetRequiredService<BM25Retriever>();
+            var dense = sp.GetRequiredService<DenseRetriever>();
+            var config = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HybridSearchConfig>>();
+            var logger = sp.GetRequiredService<ILogger<HybridRetriever>>();
+            return new HybridRetriever(bm25, dense, config, logger);
+        });
 
         // Register factory
         services.AddScoped<RetrievalStrategyFactory>();
@@ -125,17 +139,20 @@ public class RetrievalStrategyFactoryIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void Factory_WithRealDI_HybridNotImplemented()
+    public void Factory_WithRealDI_CreatesHybridRetriever()
     {
         // Arrange
         var factory = _serviceProvider.GetRequiredService<RetrievalStrategyFactory>();
 
-        // Act & Assert
-        var exception = Should.Throw<NotImplementedException>(() =>
-            factory.CreateStrategy(RetrievalStrategyType.Hybrid));
+        // Act
+        var strategy = factory.CreateStrategy(RetrievalStrategyType.Hybrid);
 
-        exception.Message.ShouldContain("Hybrid");
-        exception.Message.ShouldContain("Epic 4");
+        // Assert
+        strategy.ShouldNotBeNull();
+        strategy.ShouldBeOfType<HybridRetriever>();
+        strategy.ShouldBeAssignableTo<IRetrievalStrategy>();
+        strategy.GetStrategyName().ShouldBe("Hybrid");
+        strategy.StrategyType.ShouldBe(RetrievalStrategyType.Hybrid);
     }
 
     [Fact]

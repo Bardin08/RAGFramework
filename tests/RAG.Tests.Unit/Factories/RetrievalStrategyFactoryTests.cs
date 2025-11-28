@@ -99,14 +99,34 @@ public class RetrievalStrategyFactoryTests
     }
 
     [Fact]
-    public void CreateStrategy_Hybrid_ThrowsNotImplementedException()
+    public void CreateStrategy_Hybrid_ReturnsHybridRetriever()
     {
-        // Act & Assert
-        var exception = Should.Throw<NotImplementedException>(() =>
-            _factory.CreateStrategy(RetrievalStrategyType.Hybrid));
+        // Arrange
+        var hybridConfig = Options.Create(new HybridSearchConfig
+        {
+            Alpha = 0.5,
+            Beta = 0.5,
+            IntermediateK = 20
+        });
 
-        exception.Message.ShouldContain("Hybrid");
-        exception.Message.ShouldContain("Epic 4");
+        var mockHybridRetriever = new Mock<HybridRetriever>(
+            Mock.Of<IRetriever>(),
+            Mock.Of<IRetriever>(),
+            hybridConfig,
+            Mock.Of<ILogger<HybridRetriever>>());
+
+        _mockServiceProvider
+            .Setup(sp => sp.GetService(typeof(HybridRetriever)))
+            .Returns(mockHybridRetriever.Object);
+
+        // Act
+        var strategy = _factory.CreateStrategy(RetrievalStrategyType.Hybrid);
+
+        // Assert
+        strategy.ShouldNotBeNull();
+        strategy.ShouldBeAssignableTo<IRetrievalStrategy>();
+        strategy.GetStrategyName().ShouldBe("Hybrid");
+        strategy.StrategyType.ShouldBe(RetrievalStrategyType.Hybrid);
     }
 
     [Fact]
