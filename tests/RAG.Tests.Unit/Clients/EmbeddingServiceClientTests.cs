@@ -305,7 +305,7 @@ public class EmbeddingServiceClientTests
     }
 
     [Fact]
-    public async Task GenerateEmbeddingsAsync_WithInvalidConfiguration_ThrowsOnValidation()
+    public void GenerateEmbeddingsAsync_WithInvalidConfiguration_ThrowsOnValidation()
     {
         // Arrange
         var invalidOptions = new EmbeddingServiceOptions

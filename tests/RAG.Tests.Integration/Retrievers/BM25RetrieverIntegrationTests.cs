@@ -155,8 +155,9 @@ public class BM25RetrieverIntegrationTests : IAsyncLifetime
 
         foreach (var result in resultsWithHighlights)
         {
-            result.HighlightedText.ShouldContain("<em>");
-            result.HighlightedText.ShouldContain("</em>");
+            result.HighlightedText.ShouldNotBeNull();
+            result.HighlightedText!.ShouldContain("<em>");
+            result.HighlightedText!.ShouldContain("</em>");
         }
     }
 
