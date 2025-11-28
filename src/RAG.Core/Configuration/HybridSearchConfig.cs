@@ -26,6 +26,14 @@ public class HybridSearchConfig
     public int IntermediateK { get; set; } = 20;
 
     /// <summary>
+    /// Reranking method for combining BM25 and Dense results.
+    /// Valid values: "Weighted" (alpha/beta weighted scoring) or "RRF" (Reciprocal Rank Fusion).
+    /// Default: "Weighted" (preserves existing behavior).
+    /// Note: Alpha and Beta are only used when RerankingMethod is "Weighted".
+    /// </summary>
+    public string RerankingMethod { get; set; } = "Weighted";
+
+    /// <summary>
     /// Validates the configuration settings.
     /// Ensures Alpha + Beta = 1.0 and all values are within valid ranges.
     /// </summary>
@@ -57,6 +65,14 @@ public class HybridSearchConfig
         if (IntermediateK > 100)
         {
             throw new InvalidOperationException($"IntermediateK cannot exceed 100 (performance limit). Current value: {IntermediateK}");
+        }
+
+        // Validate RerankingMethod
+        if (!string.Equals(RerankingMethod, "Weighted", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(RerankingMethod, "RRF", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"RerankingMethod must be 'Weighted' or 'RRF'. Current value: '{RerankingMethod}'");
         }
     }
 }

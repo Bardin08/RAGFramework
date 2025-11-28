@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RAG.Application.Interfaces;
+using RAG.Application.Reranking;
 using RAG.Core.Configuration;
 using RAG.Core.Domain;
 using RAG.Core.Enums;
@@ -16,17 +17,20 @@ public class HybridRetriever : IRetrievalStrategy
 {
     private readonly IRetriever _bm25Retriever;
     private readonly IRetriever _denseRetriever;
+    private readonly IRRFReranker _rrfReranker;
     private readonly HybridSearchConfig _config;
     private readonly ILogger<HybridRetriever> _logger;
 
     public HybridRetriever(
         IRetriever bm25Retriever,
         IRetriever denseRetriever,
+        IRRFReranker rrfReranker,
         IOptions<HybridSearchConfig> config,
         ILogger<HybridRetriever> logger)
     {
         _bm25Retriever = bm25Retriever ?? throw new ArgumentNullException(nameof(bm25Retriever));
         _denseRetriever = denseRetriever ?? throw new ArgumentNullException(nameof(denseRetriever));
+        _rrfReranker = rrfReranker ?? throw new ArgumentNullException(nameof(rrfReranker));
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -34,8 +38,8 @@ public class HybridRetriever : IRetrievalStrategy
         _config.Validate();
 
         _logger.LogInformation(
-            "HybridRetriever initialized. Alpha={Alpha}, Beta={Beta}, IntermediateK={IntermediateK}",
-            _config.Alpha, _config.Beta, _config.IntermediateK);
+            "HybridRetriever initialized. Alpha={Alpha}, Beta={Beta}, IntermediateK={IntermediateK}, RerankingMethod={RerankingMethod}",
+            _config.Alpha, _config.Beta, _config.IntermediateK, _config.RerankingMethod);
     }
 
     /// <inheritdoc />
@@ -89,23 +93,48 @@ public class HybridRetriever : IRetrievalStrategy
             "Parallel retrieval completed. BM25: {Bm25Count} results, Dense: {DenseCount} results",
             bm25Results.Count, denseResults.Count);
 
-        // Step 2: Normalize scores and combine results with weighted scoring
-        var normalizedBm25 = NormalizeBM25Scores(bm25Results);
-        var combinedResults = CombineResults(normalizedBm25, denseResults);
+        // Step 2: Apply reranking based on configuration
+        List<RetrievalResult> finalResults;
 
-        // Step 3: Deduplication by DocumentId (keep higher combined score)
-        var deduplicated = DeduplicateResults(combinedResults);
+        if (string.Equals(_config.RerankingMethod, "RRF", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogDebug("Using RRF reranking for result fusion");
 
-        // Step 4: Sort by combined score descending and take top K
-        var finalResults = deduplicated
-            .OrderByDescending(r => r.Score)
-            .Take(topK)
-            .ToList();
+            // RRF path: Prepare result sets for RRF (order matters: rank 1 = first element)
+            var resultSets = new List<List<RetrievalResult>>
+            {
+                bm25Results,  // BM25 results (already ranked by score)
+                denseResults  // Dense results (already ranked by score)
+            };
+
+            // RRF reranking (handles deduplication, scoring, sorting, topK internally)
+            finalResults = _rrfReranker.Rerank(resultSets, topK);
+
+            _logger.LogInformation(
+                "RRF reranking completed. Final results: {Count}",
+                finalResults.Count);
+        }
+        else // Default: "Weighted"
+        {
+            _logger.LogDebug(
+                "Using weighted scoring for result fusion (alpha={Alpha}, beta={Beta})",
+                _config.Alpha, _config.Beta);
+
+            // Weighted path: Existing weighted scoring logic
+            var normalizedBm25 = NormalizeBM25Scores(bm25Results);
+            var combinedResults = CombineResults(normalizedBm25, denseResults);
+            var deduplicated = DeduplicateResults(combinedResults);
+
+            finalResults = deduplicated
+                .OrderByDescending(r => r.Score)
+                .Take(topK)
+                .ToList();
+        }
 
         stopwatch.Stop();
         _logger.LogInformation(
-            "Hybrid retrieval completed in {ElapsedMs}ms, returned {Count} results (topK={TopK})",
-            stopwatch.ElapsedMilliseconds, finalResults.Count, topK);
+            "Hybrid retrieval completed in {ElapsedMs}ms using {Method} method, returned {Count} results (topK={TopK})",
+            stopwatch.ElapsedMilliseconds, _config.RerankingMethod, finalResults.Count, topK);
 
         return finalResults;
     }

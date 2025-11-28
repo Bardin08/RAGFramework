@@ -6,6 +6,7 @@ using RAG.API.Authentication;
 using RAG.API.Filters;
 using RAG.API.Middleware;
 using RAG.Application.Interfaces;
+using RAG.Application.Reranking;
 using RAG.Application.Services;
 using RAG.Core.Configuration;
 using RAG.Infrastructure.Data;
@@ -80,6 +81,8 @@ try
         builder.Configuration.GetSection("RetrievalSettings"));
     builder.Services.Configure<HybridSearchConfig>(
         builder.Configuration.GetSection("HybridSearch"));
+    builder.Services.Configure<RRFConfig>(
+        builder.Configuration.GetSection("RRF"));
 
     // Configure authentication
     if (builder.Environment.IsDevelopment())
@@ -181,14 +184,16 @@ try
     builder.Services.AddScoped<DenseRetriever>(); // Registered as concrete class for factory pattern (Story 3.4)
     builder.Services.AddScoped<HybridRetriever>(sp =>
     {
-        // HybridRetriever depends on IRetriever (DIP), resolve concrete retrievers
+        // HybridRetriever depends on IRetriever (DIP), resolve concrete retrievers + RRF reranker
         var bm25 = sp.GetRequiredService<BM25Retriever>();
         var dense = sp.GetRequiredService<DenseRetriever>();
+        var rrfReranker = sp.GetRequiredService<IRRFReranker>();
         var config = sp.GetRequiredService<IOptions<HybridSearchConfig>>();
         var logger = sp.GetRequiredService<ILogger<HybridRetriever>>();
-        return new HybridRetriever(bm25, dense, config, logger);
-    }); // Story 4.2
+        return new HybridRetriever(bm25, dense, rrfReranker, config, logger);
+    }); // Story 4.2, Story 4.4
     builder.Services.AddScoped<RAG.Infrastructure.Factories.RetrievalStrategyFactory>(); // Factory for retrieval strategies (Story 3.4)
+    builder.Services.AddScoped<IRRFReranker, RRFReranker>(); // Story 4.3
     builder.Services.AddScoped<IFileValidationService, FileValidationService>();
     builder.Services.AddScoped<ITenantContext, TenantContext>();
     builder.Services.AddScoped<IFileUploadService, FileUploadService>();

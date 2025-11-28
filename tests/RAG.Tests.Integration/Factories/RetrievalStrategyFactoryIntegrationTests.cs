@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using RAG.Application.Interfaces;
+using RAG.Application.Reranking;
 using RAG.Core.Configuration;
 using RAG.Core.Enums;
 using RAG.Infrastructure.Factories;
@@ -61,7 +62,8 @@ public class RetrievalStrategyFactoryIntegrationTests : IDisposable
                 // Hybrid Search Settings
                 ["HybridSearch:Alpha"] = "0.5",
                 ["HybridSearch:Beta"] = "0.5",
-                ["HybridSearch:IntermediateK"] = "20"
+                ["HybridSearch:IntermediateK"] = "20",
+                ["HybridSearch:RerankingMethod"] = "Weighted"
             })
             .Build();
 
@@ -86,6 +88,9 @@ public class RetrievalStrategyFactoryIntegrationTests : IDisposable
         var mockVectorStoreClient = new Mock<IVectorStoreClient>();
         services.AddScoped<IVectorStoreClient>(_ => mockVectorStoreClient.Object);
 
+        var mockRRFReranker = new Mock<IRRFReranker>();
+        services.AddScoped<IRRFReranker>(_ => mockRRFReranker.Object);
+
         // Register retrievers as concrete classes (required for factory pattern)
         services.AddScoped<BM25Retriever>();
         services.AddScoped<DenseRetriever>();
@@ -93,9 +98,10 @@ public class RetrievalStrategyFactoryIntegrationTests : IDisposable
         {
             var bm25 = sp.GetRequiredService<BM25Retriever>();
             var dense = sp.GetRequiredService<DenseRetriever>();
+            var rrfReranker = sp.GetRequiredService<IRRFReranker>();
             var config = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HybridSearchConfig>>();
             var logger = sp.GetRequiredService<ILogger<HybridRetriever>>();
-            return new HybridRetriever(bm25, dense, config, logger);
+            return new HybridRetriever(bm25, dense, rrfReranker, config, logger);
         });
 
         // Register factory

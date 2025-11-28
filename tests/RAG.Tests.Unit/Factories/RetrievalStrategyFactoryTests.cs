@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using RAG.Application.Interfaces;
+using RAG.Application.Reranking;
 using RAG.Core.Configuration;
 using RAG.Core.Enums;
 using RAG.Infrastructure.Factories;
@@ -112,6 +113,7 @@ public class RetrievalStrategyFactoryTests
         var mockHybridRetriever = new Mock<HybridRetriever>(
             Mock.Of<IRetriever>(),
             Mock.Of<IRetriever>(),
+            Mock.Of<IRRFReranker>(),
             hybridConfig,
             Mock.Of<ILogger<HybridRetriever>>());
 

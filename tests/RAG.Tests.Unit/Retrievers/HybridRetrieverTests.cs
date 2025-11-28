@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using RAG.Application.Interfaces;
+using RAG.Application.Reranking;
 using RAG.Core.Configuration;
 using RAG.Core.Domain;
 using RAG.Infrastructure.Retrievers;
@@ -13,6 +14,7 @@ public class HybridRetrieverTests
 {
     private readonly Mock<IRetriever> _bm25RetrieverMock;
     private readonly Mock<IRetriever> _denseRetrieverMock;
+    private readonly Mock<IRRFReranker> _rrfRerankerMock;
     private readonly Mock<ILogger<HybridRetriever>> _loggerMock;
     private readonly HybridSearchConfig _config;
     private readonly FakeBM25Retriever _fakeBM25Retriever;
@@ -22,13 +24,15 @@ public class HybridRetrieverTests
     {
         _bm25RetrieverMock = new Mock<IRetriever>();
         _denseRetrieverMock = new Mock<IRetriever>();
+        _rrfRerankerMock = new Mock<IRRFReranker>();
         _loggerMock = new Mock<ILogger<HybridRetriever>>();
 
         _config = new HybridSearchConfig
         {
             Alpha = 0.5,
             Beta = 0.5,
-            IntermediateK = 20
+            IntermediateK = 20,
+            RerankingMethod = "Weighted" // Default
         };
 
         // Create fake retrievers for tests that need concrete implementations
@@ -70,7 +74,7 @@ public class HybridRetrieverTests
     {
         // Arrange, Act & Assert
         Should.Throw<ArgumentNullException>(() =>
-            new HybridRetriever(null!, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object));
+            new HybridRetriever(null!, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object));
     }
 
     [Fact]
@@ -78,7 +82,15 @@ public class HybridRetrieverTests
     {
         // Arrange, Act & Assert
         Should.Throw<ArgumentNullException>(() =>
-            new HybridRetriever(_fakeBM25Retriever, null!, Options.Create(_config), _loggerMock.Object));
+            new HybridRetriever(_fakeBM25Retriever, null!, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object));
+    }
+
+    [Fact]
+    public void Constructor_WithNullRRFReranker_ThrowsArgumentNullException()
+    {
+        // Arrange, Act & Assert
+        Should.Throw<ArgumentNullException>(() =>
+            new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, null!, Options.Create(_config), _loggerMock.Object));
     }
 
     [Fact]
@@ -86,7 +98,7 @@ public class HybridRetrieverTests
     {
         // Arrange, Act & Assert
         Should.Throw<ArgumentNullException>(() =>
-            new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, null!, _loggerMock.Object));
+            new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, null!, _loggerMock.Object));
     }
 
     [Fact]
@@ -94,7 +106,7 @@ public class HybridRetrieverTests
     {
         // Arrange, Act & Assert
         Should.Throw<ArgumentNullException>(() =>
-            new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), null!));
+            new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), null!));
     }
 
     [Fact]
@@ -105,19 +117,37 @@ public class HybridRetrieverTests
         {
             Alpha = 0.6,
             Beta = 0.6, // Sum = 1.2, invalid
-            IntermediateK = 20
+            IntermediateK = 20,
+            RerankingMethod = "Weighted"
         };
 
         // Act & Assert
         Should.Throw<InvalidOperationException>(() =>
-            new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(invalidConfig), _loggerMock.Object));
+            new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(invalidConfig), _loggerMock.Object));
+    }
+
+    [Fact]
+    public void Constructor_WithInvalidRerankingMethod_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var invalidConfig = new HybridSearchConfig
+        {
+            Alpha = 0.5,
+            Beta = 0.5,
+            IntermediateK = 20,
+            RerankingMethod = "Invalid" // Invalid method
+        };
+
+        // Act & Assert
+        Should.Throw<InvalidOperationException>(() =>
+            new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(invalidConfig), _loggerMock.Object));
     }
 
     [Fact]
     public void GetStrategyName_ReturnsHybrid()
     {
         // Arrange
-        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object);
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object);
 
         // Act
         var strategyName = retriever.GetStrategyName();
@@ -130,7 +160,7 @@ public class HybridRetrieverTests
     public void StrategyType_ReturnsHybrid()
     {
         // Arrange
-        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object);
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object);
 
         // Act
         var strategyType = retriever.StrategyType;
@@ -153,7 +183,7 @@ public class HybridRetrieverTests
         _fakeBM25Retriever.ResultsToReturn = bm25Results;
         _fakeDenseRetriever.ResultsToReturn = denseResults;
 
-        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object);
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object);
 
         // Act
         var results = await retriever.SearchAsync(query, topK, tenantId);
@@ -195,7 +225,7 @@ public class HybridRetrieverTests
         _fakeBM25Retriever.ResultsToReturn = bm25Results;
         _fakeDenseRetriever.ResultsToReturn = denseResults;
 
-        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object);
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object);
 
         // Act
         var results = await retriever.SearchAsync(query, topK, tenantId);
@@ -233,7 +263,7 @@ public class HybridRetrieverTests
         _fakeBM25Retriever.ResultsToReturn = bm25Results;
         _fakeDenseRetriever.ResultsToReturn = denseResults;
 
-        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object);
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object);
 
         // Act
         var results = await retriever.SearchAsync(query, topK, tenantId);
@@ -276,7 +306,7 @@ public class HybridRetrieverTests
         _fakeBM25Retriever.ResultsToReturn = bm25Results;
         _fakeDenseRetriever.ResultsToReturn = denseResults;
 
-        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object);
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object);
 
         // Act
         var results = await retriever.SearchAsync(query, topK, tenantId);
@@ -308,7 +338,7 @@ public class HybridRetrieverTests
         _fakeBM25Retriever.ExceptionToThrow = new Exception("BM25 retrieval failed");
         _fakeDenseRetriever.ResultsToReturn = denseResults;
 
-        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object);
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object);
 
         // Act
         var results = await retriever.SearchAsync(query, topK, tenantId);
@@ -332,7 +362,7 @@ public class HybridRetrieverTests
         _fakeBM25Retriever.ResultsToReturn = bm25Results;
         _fakeDenseRetriever.ExceptionToThrow = new Exception("Dense retrieval failed");
 
-        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object);
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object);
 
         // Act
         var results = await retriever.SearchAsync(query, topK, tenantId);
@@ -349,7 +379,7 @@ public class HybridRetrieverTests
         // Arrange
         var topK = 5;
         var tenantId = Guid.NewGuid();
-        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object);
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object);
 
         // Act & Assert
         await Should.ThrowAsync<ArgumentException>(async () =>
@@ -365,7 +395,7 @@ public class HybridRetrieverTests
         // Arrange
         var query = "test query";
         var tenantId = Guid.NewGuid();
-        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, Options.Create(_config), _loggerMock.Object);
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(_config), _loggerMock.Object);
 
         // Act & Assert
         await Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
@@ -374,6 +404,202 @@ public class HybridRetrieverTests
         await Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
             await retriever.SearchAsync(query, -1, tenantId));
     }
+
+    #region RRF Integration Tests (Story 4.4)
+
+    [Fact]
+    public async Task SearchAsync_WithRRFMethod_CallsRRFReranker()
+    {
+        // Arrange
+        var query = "test query";
+        var topK = 5;
+        var tenantId = Guid.NewGuid();
+
+        var bm25Results = CreateMockResults(10, 0.9, 0.1);
+        var denseResults = CreateMockResults(10, 0.95, 0.15);
+
+        _fakeBM25Retriever.ResultsToReturn = bm25Results;
+        _fakeDenseRetriever.ResultsToReturn = denseResults;
+
+        var rrfConfig = new HybridSearchConfig
+        {
+            Alpha = 0.5,
+            Beta = 0.5,
+            IntermediateK = 20,
+            RerankingMethod = "RRF" // Use RRF
+        };
+
+        var expectedRRFResults = CreateMockResults(topK, 0.98, 0.9);
+        _rrfRerankerMock.Setup(x => x.Rerank(It.IsAny<List<List<RetrievalResult>>>(), topK))
+            .Returns(expectedRRFResults);
+
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(rrfConfig), _loggerMock.Object);
+
+        // Act
+        var results = await retriever.SearchAsync(query, topK, tenantId);
+
+        // Assert
+        results.ShouldBe(expectedRRFResults); // Returns RRF results
+        _rrfRerankerMock.Verify(x => x.Rerank(It.IsAny<List<List<RetrievalResult>>>(), topK), Times.Once);
+    }
+
+    [Fact]
+    public async Task SearchAsync_WithRRFMethod_PassesCorrectParametersToRRFReranker()
+    {
+        // Arrange
+        var query = "test query";
+        var topK = 10;
+        var tenantId = Guid.NewGuid();
+
+        var doc1 = Guid.NewGuid();
+        var doc2 = Guid.NewGuid();
+
+        var bm25Results = new List<RetrievalResult>
+        {
+            new(doc1, 0.9, "text1", "source1"),
+            new(doc2, 0.8, "text2", "source2")
+        };
+
+        var denseResults = new List<RetrievalResult>
+        {
+            new(doc1, 0.95, "text1", "source1"),
+            new(doc2, 0.85, "text2", "source2")
+        };
+
+        _fakeBM25Retriever.ResultsToReturn = bm25Results;
+        _fakeDenseRetriever.ResultsToReturn = denseResults;
+
+        var rrfConfig = new HybridSearchConfig
+        {
+            Alpha = 0.5,
+            Beta = 0.5,
+            IntermediateK = 20,
+            RerankingMethod = "RRF"
+        };
+
+        List<List<RetrievalResult>>? capturedResultSets = null;
+        int capturedTopK = 0;
+
+        _rrfRerankerMock.Setup(x => x.Rerank(It.IsAny<List<List<RetrievalResult>>>(), It.IsAny<int>()))
+            .Callback<List<List<RetrievalResult>>, int>((sets, k) =>
+            {
+                capturedResultSets = sets;
+                capturedTopK = k;
+            })
+            .Returns(new List<RetrievalResult>());
+
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(rrfConfig), _loggerMock.Object);
+
+        // Act
+        await retriever.SearchAsync(query, topK, tenantId);
+
+        // Assert
+        capturedResultSets.ShouldNotBeNull();
+        capturedResultSets.Count.ShouldBe(2); // BM25 and Dense result sets
+        capturedResultSets[0].ShouldBe(bm25Results);
+        capturedResultSets[1].ShouldBe(denseResults);
+        capturedTopK.ShouldBe(topK);
+    }
+
+    [Fact]
+    public async Task SearchAsync_WithWeightedMethod_DoesNotCallRRFReranker()
+    {
+        // Arrange
+        var query = "test query";
+        var topK = 5;
+        var tenantId = Guid.NewGuid();
+
+        var bm25Results = CreateMockResults(10, 0.9, 0.1);
+        var denseResults = CreateMockResults(10, 0.95, 0.15);
+
+        _fakeBM25Retriever.ResultsToReturn = bm25Results;
+        _fakeDenseRetriever.ResultsToReturn = denseResults;
+
+        var weightedConfig = new HybridSearchConfig
+        {
+            Alpha = 0.5,
+            Beta = 0.5,
+            IntermediateK = 20,
+            RerankingMethod = "Weighted" // Use weighted scoring
+        };
+
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(weightedConfig), _loggerMock.Object);
+
+        // Act
+        var results = await retriever.SearchAsync(query, topK, tenantId);
+
+        // Assert
+        results.ShouldNotBeNull();
+        results.Count.ShouldBeLessThanOrEqualTo(topK);
+        _rrfRerankerMock.Verify(x => x.Rerank(It.IsAny<List<List<RetrievalResult>>>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SearchAsync_WithRRFMethod_CaseInsensitive()
+    {
+        // Arrange
+        var query = "test query";
+        var topK = 5;
+        var tenantId = Guid.NewGuid();
+
+        var bm25Results = CreateMockResults(5, 0.9, 0.1);
+        var denseResults = CreateMockResults(5, 0.95, 0.15);
+
+        _fakeBM25Retriever.ResultsToReturn = bm25Results;
+        _fakeDenseRetriever.ResultsToReturn = denseResults;
+
+        var rrfConfig = new HybridSearchConfig
+        {
+            Alpha = 0.5,
+            Beta = 0.5,
+            IntermediateK = 20,
+            RerankingMethod = "rrf" // Lowercase - should work
+        };
+
+        _rrfRerankerMock.Setup(x => x.Rerank(It.IsAny<List<List<RetrievalResult>>>(), topK))
+            .Returns(new List<RetrievalResult>());
+
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(rrfConfig), _loggerMock.Object);
+
+        // Act
+        await retriever.SearchAsync(query, topK, tenantId);
+
+        // Assert
+        _rrfRerankerMock.Verify(x => x.Rerank(It.IsAny<List<List<RetrievalResult>>>(), topK), Times.Once);
+    }
+
+    [Fact]
+    public async Task SearchAsync_WithWeightedMethod_CaseInsensitive()
+    {
+        // Arrange
+        var query = "test query";
+        var topK = 5;
+        var tenantId = Guid.NewGuid();
+
+        var bm25Results = CreateMockResults(5, 0.9, 0.1);
+        var denseResults = CreateMockResults(5, 0.95, 0.15);
+
+        _fakeBM25Retriever.ResultsToReturn = bm25Results;
+        _fakeDenseRetriever.ResultsToReturn = denseResults;
+
+        var weightedConfig = new HybridSearchConfig
+        {
+            Alpha = 0.5,
+            Beta = 0.5,
+            IntermediateK = 20,
+            RerankingMethod = "weighted" // Lowercase - should work
+        };
+
+        var retriever = new HybridRetriever(_fakeBM25Retriever, _fakeDenseRetriever, _rrfRerankerMock.Object, Options.Create(weightedConfig), _loggerMock.Object);
+
+        // Act
+        await retriever.SearchAsync(query, topK, tenantId);
+
+        // Assert
+        _rrfRerankerMock.Verify(x => x.Rerank(It.IsAny<List<List<RetrievalResult>>>(), It.IsAny<int>()), Times.Never);
+    }
+
+    #endregion
 
     // Helper method to create mock results with scores in descending order
     private static List<RetrievalResult> CreateMockResults(int count, double maxScore, double minScore)
