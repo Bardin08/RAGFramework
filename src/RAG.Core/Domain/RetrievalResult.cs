@@ -8,9 +8,11 @@ namespace RAG.Core.Domain;
 /// <param name="Text">The retrieved text snippet or chunk.</param>
 /// <param name="Source">The source of the document (filename or path).</param>
 /// <param name="HighlightedText">Optional highlighted snippet with matched terms emphasized.</param>
+/// <param name="Metadata">Optional metadata for hybrid retrieval (e.g., individual BM25/Dense scores).</param>
 public record RetrievalResult(
     Guid DocumentId,
     double Score,
     string Text,
     string Source,
-    string? HighlightedText = null);
+    string? HighlightedText = null,
+    Dictionary<string, object>? Metadata = null);

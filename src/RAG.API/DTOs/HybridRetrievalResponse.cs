@@ -18,13 +18,13 @@ public record HybridRetrievalResponse(
 );
 
 /// <summary>
-/// Metadata for hybrid retrieval response.
+/// Metadata for hybrid retrieval response showing how retrievers contributed.
 /// </summary>
-/// <param name="Alpha">Weight used for BM25 results.</param>
-/// <param name="Beta">Weight used for Dense results.</param>
+/// <param name="Alpha">Weight used for BM25 results in combination.</param>
+/// <param name="Beta">Weight used for Dense results in combination.</param>
 /// <param name="RerankingMethod">Reranking method used ("Weighted" or "RRF").</param>
-/// <param name="BM25ResultCount">Number of results from BM25 retriever.</param>
-/// <param name="DenseResultCount">Number of results from Dense retriever.</param>
+/// <param name="BM25ResultCount">Count of BM25 results BEFORE deduplication.</param>
+/// <param name="DenseResultCount">Count of Dense results BEFORE deduplication.</param>
 public record HybridRetrievalMetadata(
     double Alpha,
     double Beta,

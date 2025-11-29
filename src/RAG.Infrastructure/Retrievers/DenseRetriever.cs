@@ -140,15 +140,12 @@ public class DenseRetriever : IRetrievalStrategy
 
                 // Extract payload fields
                 var text = payload.GetValueOrDefault("text")?.ToString() ?? string.Empty;
-                var documentId = payload.ContainsKey("documentId") && Guid.TryParse(payload["documentId"]?.ToString(), out var docId)
-                    ? docId
-                    : id;
                 var source = payload.GetValueOrDefault("source")?.ToString()
                     ?? payload.GetValueOrDefault("metadata")?.ToString()
                     ?? "Unknown";
 
                 var result = new RetrievalResult(
-                    DocumentId: documentId,
+                    DocumentId: id, // Use chunk ID (point ID) for proper deduplication in hybrid retrieval
                     Score: normalizedScore,
                     Text: text,
                     Source: source,

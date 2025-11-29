@@ -146,7 +146,7 @@ public class BM25Retriever : IRetrievalStrategy
                 }
 
                 var result = new RetrievalResult(
-                    DocumentId: hit.Source.DocumentId,
+                    DocumentId: hit.Source.Id, // Use chunk ID for proper deduplication in hybrid retrieval
                     Score: hit.Score ?? 0.0,
                     Text: hit.Source.Text,
                     Source: hit.Source.Metadata?.GetValueOrDefault("source")?.ToString() ?? "Unknown",
