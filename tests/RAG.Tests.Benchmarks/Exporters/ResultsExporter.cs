@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using RAG.Tests.Benchmarks.Metrics;
 
 namespace RAG.Tests.Benchmarks.Exporters;
 
@@ -96,6 +97,87 @@ public static class ResultsExporter
         }, jsonOptions);
 
         File.WriteAllText(filePath, json, Encoding.UTF8);
+    }
+
+    /// <summary>
+    /// Exports comparison table with statistical significance testing.
+    /// Compares all strategies against BM25 baseline and includes delta percentages and p-values.
+    /// </summary>
+    /// <param name="metrics">Dictionary of metrics keyed by "Strategy|QueryType".</param>
+    /// <param name="rawResults">Raw per-query results for statistical testing (Strategy -> List of precision scores).</param>
+    /// <param name="filePath">Path to the output comparison CSV file.</param>
+    public static void ExportComparisonTable(
+        Dictionary<string, BenchmarkMetrics> metrics,
+        Dictionary<string, List<double>> rawResults,
+        string filePath)
+    {
+        var directory = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        using var writer = new StreamWriter(filePath, false, Encoding.UTF8);
+
+        // Write header
+        writer.WriteLine("Strategy,Precision@5,Δ vs BM25,p-value,Significance,Recall@5,MRR,Latency_P95_ms");
+
+        // Get overall metrics for each strategy
+        var overallMetrics = metrics
+            .Where(m => m.Key.Contains("|Overall"))
+            .OrderBy(m => m.Key)
+            .ToList();
+
+        // Get BM25 baseline
+        var bm25Overall = overallMetrics.FirstOrDefault(m => m.Key.StartsWith("BM25"));
+        if (bm25Overall.Key == null)
+        {
+            writer.WriteLine("# Error: BM25 baseline not found");
+            return;
+        }
+
+        var bm25Precision = bm25Overall.Value.Precision5;
+        var bm25RawScores = rawResults.ContainsKey("BM25") ? rawResults["BM25"].ToArray() : Array.Empty<double>();
+
+        // Write rows for each strategy
+        foreach (var (key, metric) in overallMetrics)
+        {
+            var strategy = key.Split('|')[0];
+            var precision5 = metric.Precision5;
+            var delta = StatisticalTests.CalculateImprovementPercentage(bm25Precision, precision5);
+
+            string pValueStr = "n/a";
+            string significance = "";
+
+            // Perform t-test if not BM25 and raw results available
+            if (strategy != "BM25" && rawResults.ContainsKey(strategy) && bm25RawScores.Length > 0)
+            {
+                var strategyRawScores = rawResults[strategy].ToArray();
+                if (strategyRawScores.Length == bm25RawScores.Length && strategyRawScores.Length >= 2)
+                {
+                    try
+                    {
+                        var (_, pValue, isSignificant) = StatisticalTests.PairedTTest(strategyRawScores, bm25RawScores);
+                        pValueStr = pValue < 0.001 ? "<0.001" : $"{pValue:F4}";
+                        significance = StatisticalTests.GetSignificanceIndicator(pValue);
+                    }
+                    catch
+                    {
+                        pValueStr = "error";
+                    }
+                }
+            }
+
+            var deltaStr = strategy == "BM25" ? "-" : $"{delta:+0.0;-0.0}%";
+
+            writer.WriteLine(
+                $"{strategy},{precision5:F4},{deltaStr},{pValueStr},{significance}," +
+                $"{metric.Recall5:F4},{metric.MRR:F4},{metric.P95Ms:F2}");
+        }
+
+        // Add significance legend
+        writer.WriteLine();
+        writer.WriteLine("# Significance: * p<0.05, ** p<0.01, *** p<0.001");
     }
 
     /// <summary>
