@@ -11,6 +11,7 @@ using RAG.Core.Configuration;
 using RAG.Core.Domain;
 using RAG.Infrastructure.Retrievers;
 using RAG.Infrastructure.Clients;
+using RAG.Application.Reranking;
 using RAG.Tests.Benchmarks.Data;
 using RAG.Tests.Benchmarks.Exporters;
 using RAG.Tests.Benchmarks.Metrics;
@@ -19,7 +20,7 @@ using RAG.Tests.Benchmarks.Reports;
 namespace RAG.Tests.Benchmarks.Retrievers;
 
 /// <summary>
-/// Benchmark comparing BM25 and Dense retrieval strategies.
+/// Benchmark comparing BM25, Dense, Hybrid-Weighted, and Hybrid-RRF retrieval strategies.
 /// </summary>
 /// <remarks>
 /// NOTE: This benchmark requires Elasticsearch, Qdrant, and the embedding service to be running.
@@ -29,12 +30,14 @@ namespace RAG.Tests.Benchmarks.Retrievers;
 [SimpleJob(RuntimeMoniker.Net80, warmupCount: 3, iterationCount: 10)]
 public class RetrievalBenchmarks
 {
-    [Params("BM25", "Dense")]
+    [Params("BM25", "Dense", "Hybrid-Weighted", "Hybrid-RRF")]
     public string Strategy { get; set; } = "BM25";
 
     private ServiceProvider? _serviceProvider;
     private BM25Retriever? _bm25Retriever;
     private DenseRetriever? _denseRetriever;
+    private HybridRetriever? _hybridWeightedRetriever;
+    private HybridRetriever? _hybridRrfRetriever;
     private BenchmarkDataset? _dataset;
     private Guid _testTenantId = Guid.NewGuid();
     private IElasticClient? _elasticClient;
@@ -71,6 +74,8 @@ public class RetrievalBenchmarks
         services.Configure<EmbeddingServiceSettings>(configuration.GetSection("EmbeddingService"));
         services.Configure<BM25Settings>(configuration.GetSection("BM25Settings"));
         services.Configure<DenseSettings>(configuration.GetSection("DenseSettings"));
+        services.Configure<HybridSearchConfig>(configuration.GetSection("HybridSearch"));
+        services.Configure<RRFConfig>(configuration.GetSection("RRF"));
 
         // Register clients
         services.AddSingleton<IElasticClient>(sp =>
@@ -92,6 +97,8 @@ public class RetrievalBenchmarks
         services.AddHttpClient<IEmbeddingService, EmbeddingServiceClient>();
         services.AddScoped<BM25Retriever>();
         services.AddScoped<DenseRetriever>();
+        services.AddScoped<IRRFReranker, RRFReranker>();
+        services.AddScoped<HybridRetriever>();
 
         // Register tenant context (mock for benchmarks)
         services.AddScoped<ITenantContext>(sp => new BenchmarkTenantContext(_testTenantId));
@@ -104,6 +111,40 @@ public class RetrievalBenchmarks
         _elasticClient = _serviceProvider.GetRequiredService<IElasticClient>();
         _qdrantClient = _serviceProvider.GetRequiredService<QdrantClient>();
         _embeddingService = _serviceProvider.GetRequiredService<IEmbeddingService>();
+
+        // Manually create hybrid retrievers with different configurations
+        var logger = _serviceProvider.GetRequiredService<ILogger<HybridRetriever>>();
+        var rrfReranker = _serviceProvider.GetRequiredService<IRRFReranker>();
+
+        // Hybrid with weighted scoring (alpha=0.5, beta=0.5)
+        var weightedConfig = new HybridSearchConfig
+        {
+            Alpha = 0.5,
+            Beta = 0.5,
+            IntermediateK = 20,
+            RerankingMethod = "Weighted"
+        };
+        _hybridWeightedRetriever = new HybridRetriever(
+            _bm25Retriever,
+            _denseRetriever,
+            rrfReranker,
+            Options.Create(weightedConfig),
+            logger);
+
+        // Hybrid with RRF reranking
+        var rrfConfig = new HybridSearchConfig
+        {
+            Alpha = 0.5, // Not used for RRF, but required by config
+            Beta = 0.5,  // Not used for RRF, but required by config
+            IntermediateK = 20,
+            RerankingMethod = "RRF"
+        };
+        _hybridRrfRetriever = new HybridRetriever(
+            _bm25Retriever,
+            _denseRetriever,
+            rrfReranker,
+            Options.Create(rrfConfig),
+            logger);
 
         // Load benchmark dataset
         var datasetPath = Path.Combine(Directory.GetCurrentDirectory(), "Data", "benchmark-dataset.json");
@@ -124,7 +165,7 @@ public class RetrievalBenchmarks
         if (_dataset == null)
             throw new InvalidOperationException("Dataset not loaded");
 
-        var retriever = Strategy == "BM25" ? (IRetriever)_bm25Retriever! : (IRetriever)_denseRetriever!;
+        var retriever = GetRetrieverForStrategy(Strategy);
 
         foreach (var query in _dataset.Queries)
         {
@@ -149,6 +190,18 @@ public class RetrievalBenchmarks
             }
             _results[key].Add((precision5, recall5, mrr, latencyMs));
         }
+    }
+
+    private IRetriever GetRetrieverForStrategy(string strategy)
+    {
+        return strategy switch
+        {
+            "BM25" => _bm25Retriever!,
+            "Dense" => _denseRetriever!,
+            "Hybrid-Weighted" => _hybridWeightedRetriever!,
+            "Hybrid-RRF" => _hybridRrfRetriever!,
+            _ => throw new ArgumentException($"Unknown strategy: {strategy}")
+        };
     }
 
     [GlobalCleanup]
@@ -177,17 +230,29 @@ public class RetrievalBenchmarks
             }
         }
 
+        // Collect raw precision scores by strategy for statistical testing
+        var rawPrecisionByStrategy = new Dictionary<string, List<double>>();
+        foreach (var strategyGroup in groupedResults)
+        {
+            var strategy = strategyGroup.Key;
+            var allPrecisionScores = strategyGroup.SelectMany(g => g.Value.Select(r => r.Precision5)).ToList();
+            rawPrecisionByStrategy[strategy] = allPrecisionScores;
+        }
+
         // Export results
         var resultsDir = Path.Combine(Directory.GetCurrentDirectory(), "Results");
         var csvPath = Path.Combine(resultsDir, ResultsExporter.GetTimestampedFileName("benchmark-results", ".csv"));
         var jsonPath = Path.Combine(resultsDir, ResultsExporter.GetTimestampedFileName("benchmark-results", ".json"));
+        var comparisonPath = Path.Combine(resultsDir, ResultsExporter.GetTimestampedFileName("benchmark-results-comparison", ".csv"));
 
         ResultsExporter.ExportToCsv(aggregatedMetrics, csvPath);
         ResultsExporter.ExportToJson(aggregatedMetrics, jsonPath);
+        ResultsExporter.ExportComparisonTable(aggregatedMetrics, rawPrecisionByStrategy, comparisonPath);
 
         Console.WriteLine($"Results exported to:");
         Console.WriteLine($"  - {csvPath}");
         Console.WriteLine($"  - {jsonPath}");
+        Console.WriteLine($"  - {comparisonPath}");
 
         // Generate console report
         ReportGenerator.GenerateConsoleReport(aggregatedMetrics);
