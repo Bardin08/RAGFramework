@@ -1,112 +1,202 @@
+using FluentValidation.TestHelper;
 using RAG.Core.Domain;
+using RAG.Core.Validators;
 using Shouldly;
 
 namespace RAG.Tests.Unit.Domain;
 
 public class GenerationRequestTests
 {
-    [Fact]
-    public void Constructor_WithValidData_CreatesGenerationRequest()
-    {
-        // Arrange
-        var query = "What is RAG?";
-        var retrievedDocs = new List<RetrievalResult>
-        {
-            new RetrievalResult(Guid.NewGuid(), 0.95f, "RAG is...", "source1"),
-            new RetrievalResult(Guid.NewGuid(), 0.85f, "RAG stands for...", "source2")
-        };
-        var maxTokens = 500;
-        var temperature = 0.7f;
+    private readonly GenerationRequestValidator _validator;
 
-        // Act
-        var request = new GenerationRequest(query, retrievedDocs, maxTokens, temperature);
+    public GenerationRequestTests()
+    {
+        _validator = new GenerationRequestValidator();
+    }
+
+    [Fact]
+    public void Record_WithValidData_CreatesGenerationRequest()
+    {
+        // Arrange & Act
+        var request = new GenerationRequest
+        {
+            Query = "What is RAG?",
+            Context = "RAG stands for Retrieval-Augmented Generation",
+            MaxTokens = 500,
+            Temperature = 0.7m,
+            SystemPrompt = "You are a helpful assistant"
+        };
 
         // Assert
         request.ShouldNotBeNull();
-        request.Query.ShouldBe(query);
-        request.RetrievedDocuments.ShouldBe(retrievedDocs);
-        request.MaxTokens.ShouldBe(maxTokens);
-        request.Temperature.ShouldBe(temperature);
+        request.Query.ShouldBe("What is RAG?");
+        request.Context.ShouldBe("RAG stands for Retrieval-Augmented Generation");
+        request.MaxTokens.ShouldBe(500);
+        request.Temperature.ShouldBe(0.7m);
+        request.SystemPrompt.ShouldBe("You are a helpful assistant");
+    }
+
+    [Fact]
+    public void Record_WithDefaults_UsesDefaultValues()
+    {
+        // Arrange & Act
+        var request = new GenerationRequest();
+
+        // Assert
+        request.Query.ShouldBe(string.Empty);
+        request.Context.ShouldBe(string.Empty);
+        request.MaxTokens.ShouldBe(500);
+        request.Temperature.ShouldBe(0.7m);
+        request.SystemPrompt.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
-    [InlineData(null)]
-    public void Constructor_WithInvalidQuery_ThrowsArgumentException(string invalidQuery)
+    public void Validator_WithInvalidQuery_HasValidationError(string invalidQuery)
     {
-        // Arrange & Act & Assert
-        Should.Throw<ArgumentException>(() =>
-            new GenerationRequest(invalidQuery, new List<RetrievalResult>(), 500, 0.7f))
-            .Message.ShouldContain("Query cannot be empty");
-    }
+        // Arrange
+        var request = new GenerationRequest { Query = invalidQuery };
 
-    [Fact]
-    public void Constructor_WithNullRetrievedDocuments_ThrowsArgumentNullException()
-    {
-        // Arrange & Act & Assert
-        Should.Throw<ArgumentNullException>(() =>
-            new GenerationRequest("query", null!, 500, 0.7f));
+        // Act
+        var result = _validator.TestValidate(request);
+
+        // Assert
+        result.ShouldHaveValidationErrorFor(x => x.Query)
+            .WithErrorMessage("Query cannot be empty");
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(-100)]
-    public void Constructor_WithInvalidMaxTokens_ThrowsArgumentException(int invalidMaxTokens)
+    public void Validator_WithInvalidMaxTokens_HasValidationError(int invalidMaxTokens)
     {
-        // Arrange & Act & Assert
-        Should.Throw<ArgumentException>(() =>
-            new GenerationRequest("query", new List<RetrievalResult>(), invalidMaxTokens, 0.7f))
-            .Message.ShouldContain("MaxTokens must be greater than 0");
-    }
+        // Arrange
+        var request = new GenerationRequest
+        {
+            Query = "test",
+            MaxTokens = invalidMaxTokens
+        };
 
-    [Theory]
-    [InlineData(-0.1f)]
-    [InlineData(2.1f)]
-    [InlineData(3.0f)]
-    public void Constructor_WithInvalidTemperature_ThrowsArgumentException(float invalidTemperature)
-    {
-        // Arrange & Act & Assert
-        Should.Throw<ArgumentException>(() =>
-            new GenerationRequest("query", new List<RetrievalResult>(), 500, invalidTemperature))
-            .Message.ShouldContain("Temperature must be between 0.0 and 2.0");
-    }
-
-    [Theory]
-    [InlineData(0.0f)]
-    [InlineData(0.5f)]
-    [InlineData(1.0f)]
-    [InlineData(2.0f)]
-    public void Constructor_WithValidTemperature_CreatesGenerationRequest(float temperature)
-    {
-        // Arrange & Act
-        var request = new GenerationRequest("query", new List<RetrievalResult>(), 500, temperature);
+        // Act
+        var result = _validator.TestValidate(request);
 
         // Assert
-        request.Temperature.ShouldBe(temperature);
+        result.ShouldHaveValidationErrorFor(x => x.MaxTokens)
+            .WithErrorMessage("MaxTokens must be greater than 0");
+    }
+
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(1.1)]
+    [InlineData(2.0)]
+    public void Validator_WithInvalidTemperature_HasValidationError(double invalidTemperature)
+    {
+        // Arrange
+        var request = new GenerationRequest
+        {
+            Query = "test",
+            Temperature = (decimal)invalidTemperature
+        };
+
+        // Act
+        var result = _validator.TestValidate(request);
+
+        // Assert
+        result.ShouldHaveValidationErrorFor(x => x.Temperature)
+            .WithErrorMessage("Temperature must be between 0.0 and 1.0");
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(0.5)]
+    [InlineData(0.7)]
+    [InlineData(1.0)]
+    public void Validator_WithValidTemperature_PassesValidation(double temperature)
+    {
+        // Arrange
+        var request = new GenerationRequest
+        {
+            Query = "test",
+            Temperature = (decimal)temperature
+        };
+
+        // Act
+        var result = _validator.TestValidate(request);
+
+        // Assert
+        result.ShouldNotHaveValidationErrorFor(x => x.Temperature);
     }
 
     [Fact]
-    public void Constructor_WithEmptyRetrievedDocuments_CreatesGenerationRequest()
+    public void Record_WithEmptyContext_IsValid()
     {
         // Arrange & Act
-        var request = new GenerationRequest("query", new List<RetrievalResult>(), 500, 0.7f);
+        var request = new GenerationRequest
+        {
+            Query = "test",
+            Context = string.Empty
+        };
 
         // Assert
-        request.RetrievedDocuments.ShouldNotBeNull();
-        request.RetrievedDocuments.ShouldBeEmpty();
+        request.Context.ShouldBeEmpty();
+        var result = _validator.TestValidate(request);
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Record_Immutability_WithExpressionWorks()
+    {
+        // Arrange
+        var original = new GenerationRequest
+        {
+            Query = "original",
+            MaxTokens = 100
+        };
+
+        // Act
+        var modified = original with { Query = "modified" };
+
+        // Assert
+        original.Query.ShouldBe("original");
+        modified.Query.ShouldBe("modified");
+        modified.MaxTokens.ShouldBe(100);
     }
 
     [Fact]
     public void RecordEquality_WithSameValues_AreEqual()
     {
         // Arrange
-        var docs = new List<RetrievalResult> { new RetrievalResult(Guid.NewGuid(), 0.9f, "text", "source") };
-        var request1 = new GenerationRequest("query", docs, 500, 0.7f);
-        var request2 = new GenerationRequest("query", docs, 500, 0.7f);
+        var request1 = new GenerationRequest
+        {
+            Query = "test",
+            Context = "context",
+            MaxTokens = 500,
+            Temperature = 0.7m
+        };
+        var request2 = new GenerationRequest
+        {
+            Query = "test",
+            Context = "context",
+            MaxTokens = 500,
+            Temperature = 0.7m
+        };
 
         // Act & Assert
         request1.ShouldBe(request2);
+        (request1 == request2).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void RecordEquality_WithDifferentValues_AreNotEqual()
+    {
+        // Arrange
+        var request1 = new GenerationRequest { Query = "query1" };
+        var request2 = new GenerationRequest { Query = "query2" };
+
+        // Act & Assert
+        request1.ShouldNotBe(request2);
+        (request1 != request2).ShouldBeTrue();
     }
 }

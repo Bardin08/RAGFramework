@@ -83,6 +83,10 @@ try
         builder.Configuration.GetSection("HybridSearch"));
     builder.Services.Configure<RRFConfig>(
         builder.Configuration.GetSection("RRF"));
+    builder.Services.Configure<RAG.Infrastructure.Configuration.OpenAIOptions>(
+        builder.Configuration.GetSection("LLMProviders:OpenAI"));
+    builder.Services.Configure<RAG.Infrastructure.Configuration.OllamaOptions>(
+        builder.Configuration.GetSection("LLMProviders:Ollama"));
 
     // Configure authentication
     if (builder.Environment.IsDevelopment())
@@ -207,6 +211,23 @@ try
     builder.Services.AddScoped<IQueryClassifier, QueryClassifier>(); // Story 4.1, Story 4.5
     builder.Services.AddScoped<IFileValidationService, FileValidationService>();
     builder.Services.AddScoped<ITenantContext, TenantContext>();
+
+    // Register LLM providers (Story 5.2, Story 5.3)
+    builder.Services.AddSingleton<RAG.Infrastructure.LLMProviders.OpenAIProvider>();
+    builder.Services.AddSingleton<RAG.Infrastructure.LLMProviders.OllamaProvider>();
+    // Register a default LLM provider (can be selected via configuration)
+    builder.Services.AddSingleton<RAG.Core.Interfaces.ILLMProvider>(sp =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var defaultProvider = config.GetValue<string>("LLMProviders:Default") ?? "OpenAI";
+
+        return defaultProvider.ToLower() switch
+        {
+            "ollama" => sp.GetRequiredService<RAG.Infrastructure.LLMProviders.OllamaProvider>(),
+            "openai" => sp.GetRequiredService<RAG.Infrastructure.LLMProviders.OpenAIProvider>(),
+            _ => sp.GetRequiredService<RAG.Infrastructure.LLMProviders.OpenAIProvider>()
+        };
+    });
     builder.Services.AddScoped<IFileUploadService, FileUploadService>();
     builder.Services.AddScoped<IDocumentStorageService, MinIODocumentStorageService>();
     builder.Services.AddSingleton<IHashService, Sha256HashService>();
