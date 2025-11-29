@@ -120,23 +120,21 @@ public class HybridRetrievalController : ControllerBase
                 cancellationToken);
             stopwatch.Stop();
 
-            // Track BM25 and Dense result counts from metadata (if available)
-            int bm25Count = 0;
-            int denseCount = 0;
-
-            // Map domain results to DTOs with individual scores
+            // Map domain results to DTOs
+            // Extract individual BM25/Dense scores from result metadata
             var resultDtos = results.Select(r =>
             {
-                // Extract individual scores from result metadata if available
-                var bm25Score = r.Source.Contains("BM25", StringComparison.OrdinalIgnoreCase) ? (double?)r.Score : null;
-                var denseScore = r.Source.Contains("Dense", StringComparison.OrdinalIgnoreCase) ? (double?)r.Score : null;
+                double? bm25Score = null;
+                double? denseScore = null;
 
-                // Try to parse from source metadata or use combined score
-                // In actual implementation, HybridRetriever should provide these in metadata
-                // For now, we'll use the combined score
+                if (r.Metadata != null)
+                {
+                    if (r.Metadata.TryGetValue("BM25Score", out var bm25Obj) && bm25Obj is double bm25Val)
+                        bm25Score = bm25Val;
 
-                if (bm25Score.HasValue) bm25Count++;
-                if (denseScore.HasValue) denseCount++;
+                    if (r.Metadata.TryGetValue("DenseScore", out var denseObj) && denseObj is double denseVal)
+                        denseScore = denseVal;
+                }
 
                 return new HybridRetrievalResultDto(
                     DocumentId: r.DocumentId,
@@ -144,18 +142,20 @@ public class HybridRetrievalController : ControllerBase
                     Text: r.Text,
                     Source: r.Source,
                     HighlightedText: r.HighlightedText,
-                    BM25Score: bm25Score,
-                    DenseScore: denseScore,
-                    CombinedScore: r.Score // The combined score is the final score after reranking
+                    BM25Score: bm25Score, // Original normalized BM25 score (if present)
+                    DenseScore: denseScore, // Original Dense score (if present)
+                    CombinedScore: r.Score // Final score after weighted combination or RRF
                 );
             }).ToList();
 
+            // Create metadata showing how retrievers contributed
+            // Result counts reflect counts BEFORE deduplication
             var metadata = new HybridRetrievalMetadata(
                 Alpha: alpha,
                 Beta: beta,
                 RerankingMethod: _config.RerankingMethod,
-                BM25ResultCount: bm25Count,
-                DenseResultCount: denseCount
+                BM25ResultCount: _hybridRetriever.LastBM25ResultCount,
+                DenseResultCount: _hybridRetriever.LastDenseResultCount
             );
 
             var response = new HybridRetrievalResponse(

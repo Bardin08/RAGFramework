@@ -21,6 +21,10 @@ public class HybridRetriever : IRetrievalStrategy
     private readonly HybridSearchConfig _config;
     private readonly ILogger<HybridRetriever> _logger;
 
+    // Track result counts for metadata (set during last SearchAsync call)
+    public int LastBM25ResultCount { get; private set; }
+    public int LastDenseResultCount { get; private set; }
+
     public HybridRetriever(
         IRetriever bm25Retriever,
         IRetriever denseRetriever,
@@ -88,6 +92,10 @@ public class HybridRetriever : IRetrievalStrategy
 
         bm25Results = await bm25Task;
         denseResults = await denseTask;
+
+        // Store counts before deduplication for metadata
+        LastBM25ResultCount = bm25Results.Count;
+        LastDenseResultCount = denseResults.Count;
 
         _logger.LogInformation(
             "Parallel retrieval completed. BM25: {Bm25Count} results, Dense: {DenseCount} results",
@@ -195,6 +203,7 @@ public class HybridRetriever : IRetrievalStrategy
     /// Combines results from BM25 and Dense retrievers with weighted scoring.
     /// Formula: combined_score = alpha * bm25_normalized_score + beta * dense_score
     /// Dense scores are already normalized to [0, 1].
+    /// Preserves individual BM25 and Dense scores in result metadata.
     /// </summary>
     private List<RetrievalResult> CombineResults(
         List<RetrievalResult> bm25Results,
@@ -202,11 +211,20 @@ public class HybridRetriever : IRetrievalStrategy
     {
         var combined = new Dictionary<Guid, RetrievalResult>();
 
-        // Add BM25 results with weighted score
+        // Add BM25 results with weighted score and preserve original score
         foreach (var result in bm25Results)
         {
             var weightedScore = _config.Alpha * result.Score;
-            combined[result.DocumentId] = result with { Score = weightedScore };
+            var metadata = new Dictionary<string, object>
+            {
+                ["BM25Score"] = result.Score, // Store original normalized BM25 score
+                ["Source"] = "BM25"
+            };
+            combined[result.DocumentId] = result with
+            {
+                Score = weightedScore,
+                Metadata = metadata
+            };
         }
 
         // Add or update with Dense results
@@ -216,14 +234,31 @@ public class HybridRetriever : IRetrievalStrategy
 
             if (combined.ContainsKey(result.DocumentId))
             {
-                // Document appears in both result sets - add dense weighted score to existing
+                // Document appears in both result sets
                 var existing = combined[result.DocumentId];
-                combined[result.DocumentId] = existing with { Score = existing.Score + weightedScore };
+                var metadata = existing.Metadata ?? new Dictionary<string, object>();
+                metadata["DenseScore"] = result.Score; // Add Dense score to existing BM25 metadata
+                metadata["Source"] = "Hybrid"; // Both sources
+
+                combined[result.DocumentId] = existing with
+                {
+                    Score = existing.Score + weightedScore,
+                    Metadata = metadata
+                };
             }
             else
             {
                 // Document only in dense results
-                combined[result.DocumentId] = result with { Score = weightedScore };
+                var metadata = new Dictionary<string, object>
+                {
+                    ["DenseScore"] = result.Score, // Store original Dense score
+                    ["Source"] = "Dense"
+                };
+                combined[result.DocumentId] = result with
+                {
+                    Score = weightedScore,
+                    Metadata = metadata
+                };
             }
         }
 
