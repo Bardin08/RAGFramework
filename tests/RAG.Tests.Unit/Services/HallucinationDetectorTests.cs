@@ -352,7 +352,7 @@ public class HallucinationDetectorTests
     }
 
     [Fact]
-    public async Task DetectAsync_NullSettings_ThrowsArgumentNullException()
+    public void DetectAsync_NullSettings_ThrowsArgumentNullException()
     {
         // Arrange & Act & Assert
         Should.Throw<ArgumentNullException>(() =>
@@ -360,7 +360,7 @@ public class HallucinationDetectorTests
     }
 
     [Fact]
-    public async Task DetectAsync_NullLogger_ThrowsArgumentNullException()
+    public void DetectAsync_NullLogger_ThrowsArgumentNullException()
     {
         // Arrange
         var optionsMock = new Mock<IOptions<HallucinationDetectionSettings>>();

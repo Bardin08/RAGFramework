@@ -320,6 +320,7 @@ userPromptTemplate: Original
         using var engine = new PromptTemplateEngine(settings, _mockLogger.Object);
 
         var original = engine.GetTemplate("reload-test");
+        original.ShouldNotBeNull();
         original.SystemPrompt.ShouldContain("Original");
 
         // Modify template
@@ -335,6 +336,7 @@ userPromptTemplate: Modified
 
         // Assert
         var reloaded = engine.GetTemplate("reload-test");
+        reloaded.ShouldNotBeNull();
         reloaded.SystemPrompt.ShouldContain("Modified");
     }
 

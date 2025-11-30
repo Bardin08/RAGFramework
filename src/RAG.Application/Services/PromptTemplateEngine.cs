@@ -57,7 +57,7 @@ public class PromptTemplateEngine : IPromptTemplateEngine, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task<RenderedPrompt> RenderTemplateAsync(
+    public Task<RenderedPrompt> RenderTemplateAsync(
         string templateName,
         Dictionary<string, string> variables,
         string? version = null,
@@ -91,12 +91,12 @@ public class PromptTemplateEngine : IPromptTemplateEngine, IDisposable
             template.Version,
             variables.Count);
 
-        return new RenderedPrompt(
+        return Task.FromResult(new RenderedPrompt(
             SystemPrompt: systemPrompt,
             UserPrompt: userPrompt,
             Parameters: template.Parameters,
             TemplateName: template.Name,
-            TemplateVersion: template.Version);
+            TemplateVersion: template.Version));
     }
 
     /// <inheritdoc/>
@@ -164,7 +164,7 @@ public class PromptTemplateEngine : IPromptTemplateEngine, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task<List<string>> ValidateTemplatesAsync(CancellationToken cancellationToken = default)
+    public Task<List<string>> ValidateTemplatesAsync(CancellationToken cancellationToken = default)
     {
         var errors = new List<string>();
 
@@ -191,7 +191,7 @@ public class PromptTemplateEngine : IPromptTemplateEngine, IDisposable
             }
         }
 
-        return errors;
+        return Task.FromResult(errors);
     }
 
     private void LoadTemplatesSync()

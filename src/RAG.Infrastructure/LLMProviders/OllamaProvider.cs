@@ -173,14 +173,14 @@ public class OllamaProvider : ILLMProvider
     }
 
     /// <inheritdoc/>
-    public async Task<IAsyncEnumerable<string>> GenerateStreamAsync(
+    public Task<IAsyncEnumerable<string>> GenerateStreamAsync(
         GenerationRequest request,
         CancellationToken cancellationToken = default)
     {
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
-        return GenerateStreamInternalAsync(request, cancellationToken);
+        return Task.FromResult(GenerateStreamInternalAsync(request, cancellationToken));
     }
 
     private async IAsyncEnumerable<string> GenerateStreamInternalAsync(
