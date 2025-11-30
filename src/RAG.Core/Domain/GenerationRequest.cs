@@ -6,45 +6,29 @@ namespace RAG.Core.Domain;
 public record GenerationRequest
 {
     /// <summary>
-    /// The user's query text.
+    /// The user's question or prompt.
     /// </summary>
-    public string Query { get; init; }
+    public string Query { get; init; } = string.Empty;
 
     /// <summary>
-    /// List of retrieved documents to use as context.
+    /// Retrieved context for generation. Can be empty for zero-shot queries.
     /// </summary>
-    public List<RetrievalResult> RetrievedDocuments { get; init; }
+    public string Context { get; init; } = string.Empty;
 
     /// <summary>
-    /// Maximum number of tokens to generate.
+    /// Maximum number of tokens to generate in the response.
     /// </summary>
-    public int MaxTokens { get; init; }
+    public int MaxTokens { get; init; } = 500;
 
     /// <summary>
-    /// The temperature parameter for generation (0.0-2.0).
+    /// Sampling temperature for generation (0.0-1.0).
+    /// Lower values make output more deterministic, higher values more creative.
     /// </summary>
-    public float Temperature { get; init; }
+    public decimal Temperature { get; init; } = 0.7m;
 
     /// <summary>
-    /// Creates a new GenerationRequest instance with validation.
+    /// System-level instructions for the LLM.
+    /// Provides default RAG instructions for context-based generation.
     /// </summary>
-    public GenerationRequest(string query, List<RetrievalResult> retrievedDocuments, int maxTokens, float temperature)
-    {
-        if (string.IsNullOrWhiteSpace(query))
-            throw new ArgumentException("Query cannot be empty", nameof(query));
-
-        if (retrievedDocuments == null)
-            throw new ArgumentNullException(nameof(retrievedDocuments));
-
-        if (maxTokens <= 0)
-            throw new ArgumentException("MaxTokens must be greater than 0", nameof(maxTokens));
-
-        if (temperature < 0.0f || temperature > 2.0f)
-            throw new ArgumentException("Temperature must be between 0.0 and 2.0", nameof(temperature));
-
-        Query = query;
-        RetrievedDocuments = retrievedDocuments;
-        MaxTokens = maxTokens;
-        Temperature = temperature;
-    }
+    public string SystemPrompt { get; init; } = "You are a helpful assistant. Answer the user's question based on the provided context. If the context doesn't contain relevant information, say so.";
 }

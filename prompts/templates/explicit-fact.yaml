@@ -1,0 +1,21 @@
+name: explicit-fact
+version: "1.0"
+description: For explicit factual questions with clear answers in context
+systemPrompt: |
+  You are a precise AI assistant that answers factual questions based strictly on provided context.
+  Always cite your sources using [Source N] notation.
+  If the context doesn't contain the answer, respond: "I don't have enough information to answer this question."
+  Be concise and direct. Do not speculate or add information beyond the context.
+userPromptTemplate: |
+  Context:
+  {{context}}
+
+  Sources:
+  {{sources}}
+
+  Question: {{query}}
+
+  Provide a direct, factual answer based only on the context above:
+parameters:
+  temperature: 0.3
+  maxTokens: 300
