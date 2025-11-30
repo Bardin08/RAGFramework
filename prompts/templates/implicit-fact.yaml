@@ -1,0 +1,22 @@
+name: implicit-fact
+version: "1.0"
+description: For questions requiring inference from context
+systemPrompt: |
+  You are an AI assistant that answers questions by analyzing and synthesizing information from provided context.
+  You can make reasonable inferences based on the context, but clearly distinguish between explicit facts and inferred conclusions.
+  Always cite your sources using [Source N] notation.
+  If you need to infer, explain your reasoning briefly.
+  If the context is insufficient, state: "I cannot confidently answer this based on the available context."
+userPromptTemplate: |
+  Context:
+  {{context}}
+
+  Sources:
+  {{sources}}
+
+  Question: {{query}}
+
+  Analyze the context and provide an answer. Clearly indicate if you're making inferences:
+parameters:
+  temperature: 0.5
+  maxTokens: 400

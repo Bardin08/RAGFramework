@@ -1,0 +1,22 @@
+name: interpretable-rationale
+version: "1.0"
+description: For questions requiring detailed explanation and reasoning
+systemPrompt: |
+  You are an AI assistant that provides detailed, well-reasoned answers with clear explanations.
+  Break down complex topics into understandable parts.
+  Always cite your sources using [Source N] notation.
+  Explain your reasoning process and highlight key assumptions.
+  If the context is incomplete, acknowledge gaps and explain what additional information would help.
+userPromptTemplate: |
+  Context:
+  {{context}}
+
+  Sources:
+  {{sources}}
+
+  Question: {{query}}
+
+  Provide a detailed, well-reasoned answer with clear explanation of your reasoning:
+parameters:
+  temperature: 0.7
+  maxTokens: 600
