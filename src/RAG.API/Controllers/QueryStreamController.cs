@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RAG.API.DTOs;
 using RAG.Application.Interfaces;
@@ -14,8 +15,20 @@ namespace RAG.API.Controllers;
 /// <summary>
 /// Controller for streaming RAG query responses using Server-Sent Events (SSE).
 /// </summary>
+/// <remarks>
+/// This endpoint requires JWT Bearer authentication.
+/// Obtain a token from Keycloak using the password grant or client credentials flow.
+/// Users must have the 'query' role to access this endpoint.
+///
+/// The streaming endpoint returns Server-Sent Events (SSE) with the following event types:
+/// - metadata: Retrieval and context assembly timing information
+/// - token: Individual tokens as they are generated
+/// - done: Final response with sources and total timing
+/// - error: Error information if something goes wrong
+/// </remarks>
 [ApiController]
 [Route("api/query")]
+[Authorize]
 public class QueryStreamController : ControllerBase
 {
     private readonly ILLMProvider _llmProvider;
@@ -41,13 +54,20 @@ public class QueryStreamController : ControllerBase
     /// <summary>
     /// Streams RAG query responses using Server-Sent Events (SSE).
     /// </summary>
-    /// <param name="request">The streaming query request.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="request">The streaming query request containing the question and optional parameters.</param>
+    /// <param name="cancellationToken">Cancellation token for async operations.</param>
     /// <returns>SSE stream with tokens, metadata, and final results.</returns>
+    /// <response code="200">SSE stream with tokens and metadata</response>
+    /// <response code="400">Invalid request parameters</response>
+    /// <response code="401">Missing or invalid authentication token</response>
+    /// <response code="403">User lacks required permissions</response>
+    /// <response code="500">Internal server error during processing</response>
     [HttpPost("stream")]
     [Produces("text/event-stream")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task StreamQuery(
         [FromBody] QueryStreamRequest request,
