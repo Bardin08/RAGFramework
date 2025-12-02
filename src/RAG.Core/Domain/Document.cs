@@ -41,10 +41,32 @@ public class Document
     public Guid TenantId { get; init; }
 
     /// <summary>
+    /// Timestamp when the document was first indexed.
+    /// </summary>
+    public DateTime CreatedAt { get; init; }
+
+    /// <summary>
+    /// Timestamp when the document was last updated.
+    /// </summary>
+    public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Parameterless constructor for EF Core.
+    /// </summary>
+    private Document()
+    {
+        // EF Core will set all properties directly
+        Title = string.Empty;
+        Content = string.Empty;
+        Metadata = new Dictionary<string, object>();
+        ChunkIds = new List<Guid>();
+    }
+
+    /// <summary>
     /// Creates a new Document instance with validation.
     /// </summary>
     public Document(Guid id, string title, string content, Guid tenantId, string? source = null,
-        Dictionary<string, object>? metadata = null, List<Guid>? chunkIds = null)
+        Dictionary<string, object>? metadata = null, List<Guid>? chunkIds = null, DateTime? createdAt = null, DateTime? updatedAt = null)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Document ID cannot be empty", nameof(id));
@@ -65,5 +87,7 @@ public class Document
         Source = source;
         Metadata = metadata ?? new Dictionary<string, object>();
         ChunkIds = chunkIds ?? new List<Guid>();
+        CreatedAt = createdAt ?? DateTime.UtcNow;
+        UpdatedAt = updatedAt ?? DateTime.UtcNow;
     }
 }

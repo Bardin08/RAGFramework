@@ -10,12 +10,12 @@ namespace RAG.Tests.Integration.Controllers;
 /// <summary>
 /// Integration tests for retrieval API endpoints.
 /// </summary>
-public class RetrievalEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
+public class RetrievalEndpointsTests : IClassFixture<TestWebApplicationFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
-    public RetrievalEndpointsTests(WebApplicationFactory<Program> factory)
+    public RetrievalEndpointsTests(TestWebApplicationFactory factory)
     {
         _factory = factory;
         _client = factory.CreateClient();

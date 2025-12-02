@@ -129,7 +129,7 @@ public class DocumentsController(
             Title = doc.Title,
             Source = doc.Source,
             ChunkCount = doc.ChunkIds.Count,
-            IndexedAt = DateTime.UtcNow // TODO: Add proper timestamp to Document entity
+            IndexedAt = doc.CreatedAt
         }).ToList();
 
         var response = new PagedResponse<DocumentListItemResponse>
@@ -177,7 +177,7 @@ public class DocumentsController(
             Title = document.Title,
             Source = document.Source,
             ChunkCount = document.ChunkIds.Count,
-            IndexedAt = DateTime.UtcNow, // TODO: Add proper timestamp to Document entity
+            IndexedAt = document.CreatedAt,
             Metadata = document.Metadata,
             Chunks = chunks.Select(chunk => new DocumentChunkInfo
             {
