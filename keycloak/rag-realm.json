@@ -1,0 +1,264 @@
+{
+  "realm": "rag",
+  "enabled": true,
+  "displayName": "RAG Application",
+  "displayNameHtml": "<strong>RAG Application</strong>",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administrator with full access"
+      },
+      {
+        "name": "user",
+        "description": "Regular user with standard access"
+      },
+      {
+        "name": "viewer",
+        "description": "Read-only access"
+      }
+    ],
+    "client": {
+      "rag-api": [
+        {
+          "name": "query",
+          "description": "Can execute queries"
+        },
+        {
+          "name": "manage-documents",
+          "description": "Can upload and manage documents"
+        },
+        {
+          "name": "admin",
+          "description": "Full administrative access to the API"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "rag-api",
+      "name": "RAG API",
+      "description": "RAG Application API Client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "rag-api-secret",
+      "redirectUris": [
+        "http://localhost:5000/*",
+        "https://localhost:5001/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5000",
+        "https://localhost:5001",
+        "http://localhost:3000"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "3600",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "backchannel.logout.session.required": "true"
+      },
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ],
+      "protocolMappers": [
+        {
+          "name": "tenant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "tenant_id",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "rag-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "rag-web",
+      "name": "RAG Web Application",
+      "description": "RAG Web Frontend Client (SPA)",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:8080/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:8080"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "bearerOnly": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "User",
+      "attributes": {
+        "tenant_id": ["00000000-0000-0000-0000-000000000001"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin",
+        "user"
+      ],
+      "clientRoles": {
+        "rag-api": [
+          "admin",
+          "query",
+          "manage-documents"
+        ]
+      }
+    },
+    {
+      "username": "testuser",
+      "email": "testuser@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "attributes": {
+        "tenant_id": ["00000000-0000-0000-0000-000000000001"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "testuser123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ],
+      "clientRoles": {
+        "rag-api": [
+          "query"
+        ]
+      }
+    },
+    {
+      "username": "viewer",
+      "email": "viewer@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Viewer",
+      "lastName": "User",
+      "attributes": {
+        "tenant_id": ["00000000-0000-0000-0000-000000000002"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "viewer123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "viewer"
+      ],
+      "clientRoles": {
+        "rag-api": []
+      }
+    }
+  ],
+  "scopeMappings": [
+    {
+      "client": "rag-api",
+      "roles": [
+        "user"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "Tenant1",
+      "path": "/Tenant1",
+      "attributes": {
+        "tenant_id": ["00000000-0000-0000-0000-000000000001"]
+      },
+      "realmRoles": [],
+      "clientRoles": {}
+    },
+    {
+      "name": "Tenant2",
+      "path": "/Tenant2",
+      "attributes": {
+        "tenant_id": ["00000000-0000-0000-0000-000000000002"]
+      },
+      "realmRoles": [],
+      "clientRoles": {}
+    }
+  ]
+}

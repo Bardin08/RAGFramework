@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Minio;
@@ -9,6 +10,7 @@ using RAG.Application.Interfaces;
 using RAG.Application.Reranking;
 using RAG.Application.Services;
 using RAG.Core.Configuration;
+using RAG.Infrastructure.Authentication;
 using RAG.Infrastructure.Data;
 using RAG.Infrastructure.Middleware;
 using RAG.Infrastructure.Repositories;
@@ -92,28 +94,119 @@ try
     builder.Services.Configure<RAG.Application.Configuration.HallucinationDetectionSettings>(
         builder.Configuration.GetSection("HallucinationDetection"));
 
-    // Configure authentication
-    if (builder.Environment.IsDevelopment() || builder.Environment.EnvironmentName == "Testing")
+    // Configure Authentication Settings
+    builder.Services.Configure<AuthenticationSettings>(
+        builder.Configuration.GetSection(AuthenticationSettings.SectionName));
+
+    // Configure authentication based on environment
+    if (builder.Environment.EnvironmentName == "Testing")
     {
-        // Use test authentication in development and testing environments
-        // Note: TestWebApplicationFactory will replace this with its own test auth scheme
+        // Testing environment: Only TestScheme for integration tests
         builder.Services.AddAuthentication("TestScheme")
             .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
                 "TestScheme",
                 options => { });
 
         builder.Services.AddAuthorization();
+    }
+    else if (builder.Environment.IsDevelopment())
+    {
+        // Development environment: Support both TestScheme AND Keycloak JWT
+        // This allows testing with simple test token OR real Keycloak tokens
+        var authSettings = builder.Configuration
+            .GetSection(AuthenticationSettings.SectionName)
+            .Get<AuthenticationSettings>();
 
-        if (builder.Environment.IsDevelopment())
+        var authBuilder = builder.Services.AddAuthentication(options =>
         {
-            Log.Warning("Using TEST AUTHENTICATION - DO NOT USE IN PRODUCTION");
-            Log.Information("Test Token: {TestToken}", TestAuthenticationHandler.TestToken);
+            // Default to TestScheme for backward compatibility
+            options.DefaultAuthenticateScheme = "TestScheme";
+            options.DefaultChallengeScheme = "TestScheme";
+        });
+
+        // Add TestScheme
+        authBuilder.AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
+            "TestScheme",
+            options => { });
+
+        // Also add JWT Bearer for Keycloak if configured
+        if (authSettings != null && !string.IsNullOrWhiteSpace(authSettings.Provider))
+        {
+            var loggerFactory = LoggerFactory.Create(loggingBuilder =>
+            {
+                loggingBuilder.AddSerilog();
+            });
+            var authProviderFactory = new AuthenticationProviderFactory(loggerFactory);
+            var authProvider = authProviderFactory.Create(authSettings.Provider);
+
+            authProvider.ConfigureAuthentication(authBuilder, builder.Configuration);
+
+            // Register claims transformation if provider has one
+            var claimsTransformation = authProvider.GetClaimsTransformation();
+            if (claimsTransformation != null)
+            {
+                builder.Services.AddSingleton<IClaimsTransformation>(claimsTransformation);
+            }
+
+            Log.Information("Development mode: Both TestScheme and {Provider} JWT authentication enabled", authSettings.Provider);
         }
+
+        // Add policy that accepts either scheme
+        builder.Services.AddAuthorization(options =>
+        {
+            options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+                .AddAuthenticationSchemes("TestScheme", JwtBearerDefaults.AuthenticationScheme)
+                .RequireAuthenticatedUser()
+                .Build();
+        });
+
+        Log.Warning("DEVELOPMENT MODE - Multiple auth schemes enabled");
+        Log.Information("Test Token: {TestToken}", TestAuthenticationHandler.TestToken);
+        Log.Information("Or use Keycloak JWT token from: http://localhost:8080/realms/rag/protocol/openid-connect/token");
     }
     else
     {
-        // TODO: Configure Keycloak JWT authentication for production
-        throw new InvalidOperationException("Production authentication not yet configured. Please configure Keycloak JWT authentication.");
+        // Production authentication: ONLY configured provider (Keycloak, Auth0, Azure AD)
+        var authSettings = builder.Configuration
+            .GetSection(AuthenticationSettings.SectionName)
+            .Get<AuthenticationSettings>();
+
+        if (authSettings == null || string.IsNullOrWhiteSpace(authSettings.Provider))
+        {
+            throw new InvalidOperationException(
+                "Authentication configuration is required for production. " +
+                "Please configure the 'Authentication' section in appsettings.json.");
+        }
+
+        Log.Information("Configuring authentication provider: {Provider}", authSettings.Provider);
+
+        // Create authentication provider using factory
+        var loggerFactory = LoggerFactory.Create(loggingBuilder =>
+        {
+            loggingBuilder.AddSerilog();
+        });
+        var authProviderFactory = new AuthenticationProviderFactory(loggerFactory);
+        var authProvider = authProviderFactory.Create(authSettings.Provider);
+
+        // Configure authentication using the provider
+        var authBuilder = builder.Services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        });
+
+        authProvider.ConfigureAuthentication(authBuilder, builder.Configuration);
+
+        // Register claims transformation if provider has one
+        var claimsTransformation = authProvider.GetClaimsTransformation();
+        if (claimsTransformation != null)
+        {
+            builder.Services.AddSingleton<IClaimsTransformation>(claimsTransformation);
+        }
+
+        builder.Services.AddAuthorization();
+
+        Log.Information("Production authentication configured with provider: {Provider}", authSettings.Provider);
     }
 
     // Add services to the container.
@@ -127,7 +220,38 @@ try
         {
             Title = "RAG Architecture API",
             Version = "v1",
-            Description = "Production-ready RAG framework for professional chatbots"
+            Description = @"Production-ready RAG (Retrieval-Augmented Generation) framework for professional chatbots.
+
+## Authentication
+This API uses **JWT Bearer** authentication with **Keycloak** as the identity provider.
+Supports multi-tenant architecture with role-based access control.
+
+### Available Roles
+- **admin**: Full administrative access
+- **user**: Standard user access (can query)
+- **viewer**: Read-only access
+
+### Test Users (Development)
+| Username | Password | Roles |
+|----------|----------|-------|
+| admin | admin123 | admin, user |
+| testuser | testuser123 | user |
+| viewer | viewer123 | viewer |
+
+## Features
+- Multi-provider LLM support (OpenAI, Ollama)
+- Hybrid search (BM25 + Dense retrieval)
+- Streaming responses
+- Multi-tenant document isolation",
+            Contact = new Microsoft.OpenApi.Models.OpenApiContact
+            {
+                Name = "RAG API Support",
+                Email = "support@example.com"
+            },
+            License = new Microsoft.OpenApi.Models.OpenApiLicense
+            {
+                Name = "MIT License"
+            }
         });
 
         // Add XML comments for better documentation
@@ -149,7 +273,17 @@ try
             Scheme = "bearer",
             BearerFormat = "JWT",
             In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-            Description = "Enter test token: dev-test-token-12345"
+            Description = @"JWT Authorization header using the Bearer scheme.
+
+**Production**: Obtain a token from Keycloak:
+```
+POST http://localhost:8080/realms/rag/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=testuser&password=testuser123
+```
+
+**Testing**: Use token: `dev-test-token-12345`"
         });
 
         options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement

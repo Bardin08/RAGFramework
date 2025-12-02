@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using RAG.API.DTOs;
@@ -16,8 +17,15 @@ namespace RAG.API.Controllers;
 /// <summary>
 /// Controller for non-streaming RAG query responses with caching.
 /// </summary>
+/// <remarks>
+/// This endpoint requires JWT Bearer authentication.
+/// Obtain a token from Keycloak using the password grant or client credentials flow.
+/// Users must have the 'query' role to access this endpoint.
+/// </remarks>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
+[Produces("application/json")]
 public class QueryController : ControllerBase
 {
     private readonly ILLMProvider _llmProvider;
@@ -49,12 +57,19 @@ public class QueryController : ControllerBase
     /// <summary>
     /// Execute a RAG query and return the complete response with sources.
     /// </summary>
-    /// <param name="request">The query request.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Complete RAG response with answer, sources, and metadata.</returns>
+    /// <param name="request">The query request containing the question and optional parameters.</param>
+    /// <param name="cancellationToken">Cancellation token for async operations.</param>
+    /// <returns>Complete RAG response with answer, sources, and performance metadata.</returns>
+    /// <response code="200">Returns the answer with sources and metadata</response>
+    /// <response code="400">Invalid request parameters</response>
+    /// <response code="401">Missing or invalid authentication token</response>
+    /// <response code="403">User lacks required permissions</response>
+    /// <response code="500">Internal server error during processing</response>
     [HttpPost]
     [ProducesResponseType(typeof(QueryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<QueryResponse>> Query(
         [FromBody] QueryRequest request,

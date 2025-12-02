@@ -43,12 +43,16 @@ services:
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
       - KC_HEALTH_ENABLED=true
-    command: start-dev
+      - KC_HTTP_ENABLED=true
+    command: >
+      start-dev
+      --import-realm
     ports:
       - "8080:8080"
       - "9000:9000"
     volumes:
       - ./data/keycloak:/opt/keycloak/data
+      - ./keycloak/rag-realm.json:/opt/keycloak/data/import/rag-realm.json:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9000/health/ready || exit 1"]
       interval: 30s
