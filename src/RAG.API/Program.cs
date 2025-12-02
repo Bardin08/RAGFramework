@@ -93,9 +93,10 @@ try
         builder.Configuration.GetSection("HallucinationDetection"));
 
     // Configure authentication
-    if (builder.Environment.IsDevelopment())
+    if (builder.Environment.IsDevelopment() || builder.Environment.EnvironmentName == "Testing")
     {
-        // Use test authentication in development
+        // Use test authentication in development and testing environments
+        // Note: TestWebApplicationFactory will replace this with its own test auth scheme
         builder.Services.AddAuthentication("TestScheme")
             .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
                 "TestScheme",
@@ -103,8 +104,11 @@ try
 
         builder.Services.AddAuthorization();
 
-        Log.Warning("Using TEST AUTHENTICATION - DO NOT USE IN PRODUCTION");
-        Log.Information("Test Token: {TestToken}", TestAuthenticationHandler.TestToken);
+        if (builder.Environment.IsDevelopment())
+        {
+            Log.Warning("Using TEST AUTHENTICATION - DO NOT USE IN PRODUCTION");
+            Log.Information("Test Token: {TestToken}", TestAuthenticationHandler.TestToken);
+        }
     }
     else
     {
@@ -164,13 +168,29 @@ try
         });
     });
 
-    // Configure Npgsql to support dynamic JSON serialization
-    var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("DefaultConnection"));
-    dataSourceBuilder.EnableDynamicJson();
-    var dataSource = dataSourceBuilder.Build();
+    // Configure database context
+    if (builder.Environment.EnvironmentName == "Testing")
+    {
+        // In test environment, register InMemory database
+        // This satisfies service validation during Build()
+        // TestWebApplicationFactory can then replace this if needed via ConfigureTestServices
+        builder.Services.AddDbContext<ApplicationDbContext>(options =>
+            options.UseInMemoryDatabase("TestDb"));
+    }
+    else
+    {
+        // In non-test environments, use Npgsql with dynamic JSON support
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
+            dataSourceBuilder.EnableDynamicJson();
+            var dataSource = dataSourceBuilder.Build();
 
-    builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseNpgsql(dataSource));
+            builder.Services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseNpgsql(dataSource));
+        }
+    }
 
     // Register MinIO SDK client
     builder.Services.AddSingleton<IMinioClient>(sp =>
@@ -309,15 +329,25 @@ try
 
     var app = builder.Build();
 
-    // Validate and log configuration
-    var appSettings = app.Services.GetRequiredService<IOptions<AppSettings>>().Value;
-    Log.Information("Configuration loaded successfully");
-    Log.Information("Elasticsearch URL: {ElasticsearchUrl}", appSettings.Elasticsearch.Url);
-    Log.Information("Qdrant URL: {QdrantUrl}", appSettings.Qdrant.Url);
-    Log.Information("Embedding Service URL: {EmbeddingServiceUrl}", appSettings.EmbeddingService.Url);
-    Log.Information("OpenAI Model: {OpenAIModel}", appSettings.OpenAI.Model);
-    Log.Information("Ollama URL: {OllamaUrl}, Model: {OllamaModel}", appSettings.Ollama.Url, appSettings.Ollama.Model);
-    Log.Information("MinIO Endpoint: {MinIOEndpoint}, Bucket: {MinIOBucket}", appSettings.MinIO.Endpoint, appSettings.MinIO.BucketName);
+    // Validate and log configuration (skip in test environments)
+    if (app.Environment.EnvironmentName != "Testing")
+    {
+        try
+        {
+            var appSettings = app.Services.GetRequiredService<IOptions<AppSettings>>().Value;
+            Log.Information("Configuration loaded successfully");
+            Log.Information("Elasticsearch URL: {ElasticsearchUrl}", appSettings.Elasticsearch.Url);
+            Log.Information("Qdrant URL: {QdrantUrl}", appSettings.Qdrant.Url);
+            Log.Information("Embedding Service URL: {EmbeddingServiceUrl}", appSettings.EmbeddingService.Url);
+            Log.Information("OpenAI Model: {OpenAIModel}", appSettings.OpenAI.Model);
+            Log.Information("Ollama URL: {OllamaUrl}, Model: {OllamaModel}", appSettings.Ollama.Url, appSettings.Ollama.Model);
+            Log.Information("MinIO Endpoint: {MinIOEndpoint}, Bucket: {MinIOBucket}", appSettings.MinIO.Endpoint, appSettings.MinIO.BucketName);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not load or validate AppSettings");
+        }
+    }
 
     // Add exception handling middleware (must be early in pipeline)
     app.UseMiddleware<ExceptionHandlingMiddleware>();
@@ -347,33 +377,36 @@ try
 
     app.MapControllers();
 
-    // Initialize Elasticsearch index and Qdrant collection on startup
-    using (var scope = app.Services.CreateScope())
+    // Initialize Elasticsearch index and Qdrant collection on startup (skip in test environments)
+    if (app.Environment.EnvironmentName != "Testing")
     {
-        var services = scope.ServiceProvider;
+        using (var scope = app.Services.CreateScope())
+        {
+            var services = scope.ServiceProvider;
 
-        try
-        {
-            Log.Information("Initializing Elasticsearch index...");
-            var searchEngineClient = services.GetRequiredService<ISearchEngineClient>();
-            await searchEngineClient.InitializeIndexAsync();
-            Log.Information("Elasticsearch index initialized successfully");
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to initialize Elasticsearch index");
-        }
+            try
+            {
+                Log.Information("Initializing Elasticsearch index...");
+                var searchEngineClient = services.GetRequiredService<ISearchEngineClient>();
+                await searchEngineClient.InitializeIndexAsync();
+                Log.Information("Elasticsearch index initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to initialize Elasticsearch index");
+            }
 
-        try
-        {
-            Log.Information("Initializing Qdrant collection...");
-            var vectorStoreClient = services.GetRequiredService<IVectorStoreClient>();
-            await vectorStoreClient.InitializeCollectionAsync();
-            Log.Information("Qdrant collection initialized successfully");
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to initialize Qdrant collection");
+            try
+            {
+                Log.Information("Initializing Qdrant collection...");
+                var vectorStoreClient = services.GetRequiredService<IVectorStoreClient>();
+                await vectorStoreClient.InitializeCollectionAsync();
+                Log.Information("Qdrant collection initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to initialize Qdrant collection");
+            }
         }
     }
 
@@ -383,6 +416,7 @@ try
 catch (Exception ex)
 {
     Log.Fatal(ex, "Application terminated unexpectedly");
+    throw; // Re-throw to make exceptions visible in tests
 }
 finally
 {

@@ -9,11 +9,11 @@ namespace RAG.Tests.Integration;
 /// <summary>
 /// Integration tests for health check endpoints.
 /// </summary>
-public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointsTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
-    public HealthEndpointsTests(WebApplicationFactory<Program> factory)
+    public HealthEndpointsTests(TestWebApplicationFactory factory)
     {
         _client = factory.CreateClient();
     }

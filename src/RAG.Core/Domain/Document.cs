@@ -51,6 +51,18 @@ public class Document
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
+    /// Parameterless constructor for EF Core.
+    /// </summary>
+    private Document()
+    {
+        // EF Core will set all properties directly
+        Title = string.Empty;
+        Content = string.Empty;
+        Metadata = new Dictionary<string, object>();
+        ChunkIds = new List<Guid>();
+    }
+
+    /// <summary>
     /// Creates a new Document instance with validation.
     /// </summary>
     public Document(Guid id, string title, string content, Guid tenantId, string? source = null,

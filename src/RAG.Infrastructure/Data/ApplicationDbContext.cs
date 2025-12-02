@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RAG.Core.Domain;
+using System.Text.Json;
 
 namespace RAG.Infrastructure.Data;
 
@@ -63,13 +65,33 @@ public class ApplicationDbContext : DbContext
                 .IsRequired()
                 .HasColumnName("tenant_id");
 
+            // Configure Metadata with JSON value converter for compatibility with both PostgreSQL and InMemory
+            var metadataConverter = new ValueConverter<Dictionary<string, object>, string>(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Deserialize<Dictionary<string, object>>(v, (JsonSerializerOptions?)null) ?? new Dictionary<string, object>());
+
             entity.Property(e => e.Metadata)
+                .HasConversion(metadataConverter)
                 .HasColumnType("jsonb")
                 .HasColumnName("metadata");
 
+            // Configure ChunkIds with JSON value converter for compatibility with both PostgreSQL and InMemory
+            var chunkIdsConverter = new ValueConverter<List<Guid>, string>(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Deserialize<List<Guid>>(v, (JsonSerializerOptions?)null) ?? new List<Guid>());
+
             entity.Property(e => e.ChunkIds)
+                .HasConversion(chunkIdsConverter)
                 .HasColumnType("jsonb")
                 .HasColumnName("chunk_ids");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.UpdatedAt)
+                .IsRequired()
+                .HasColumnName("updated_at");
 
             // Indexes
             entity.HasIndex(e => e.TenantId)
@@ -109,7 +131,13 @@ public class ApplicationDbContext : DbContext
                 .IsRequired()
                 .HasColumnName("tenant_id");
 
+            // Configure Metadata with JSON value converter for compatibility with both PostgreSQL and InMemory
+            var chunkMetadataConverter = new ValueConverter<Dictionary<string, object>, string>(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Deserialize<Dictionary<string, object>>(v, (JsonSerializerOptions?)null) ?? new Dictionary<string, object>());
+
             entity.Property(e => e.Metadata)
+                .HasConversion(chunkMetadataConverter)
                 .HasColumnType("jsonb")
                 .HasColumnName("metadata");
 
