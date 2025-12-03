@@ -4,6 +4,7 @@ using RAG.API.Extensions;
 using RAG.API.Models.Requests;
 using RAG.API.Models.Responses;
 using RAG.Application.Interfaces;
+using RAG.Core.Authorization;
 using RAG.Core.Domain.Enums;
 
 namespace RAG.API.Controllers;
@@ -32,8 +33,10 @@ public class DocumentsController(
     /// <response code="201">Document uploaded successfully.</response>
     /// <response code="400">Invalid request (file type not allowed or file empty).</response>
     /// <response code="401">Unauthorized (missing or invalid JWT token).</response>
+    /// <response code="403">Forbidden (admin role required).</response>
     /// <response code="413">File too large (exceeds 10MB limit).</response>
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(typeof(DocumentUploadResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(DocumentUploadResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -107,7 +110,9 @@ public class DocumentsController(
     /// <returns>A paginated list of documents.</returns>
     /// <response code="200">Returns the list of documents.</response>
     /// <response code="401">Unauthorized (missing or invalid JWT token).</response>
+    /// <response code="403">Forbidden (user or admin role required).</response>
     [HttpGet]
+    [Authorize(Policy = AuthorizationPolicies.UserOrAdmin)]
     [ProducesResponseType(typeof(PagedResponse<DocumentListItemResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<PagedResponse<DocumentListItemResponse>>> GetDocuments(
@@ -151,8 +156,10 @@ public class DocumentsController(
     /// <returns>Detailed document information with chunks.</returns>
     /// <response code="200">Returns the document details.</response>
     /// <response code="401">Unauthorized (missing or invalid JWT token).</response>
+    /// <response code="403">Forbidden (user or admin role required).</response>
     /// <response code="404">Document not found or belongs to different tenant.</response>
     [HttpGet("{id}")]
+    [Authorize(Policy = AuthorizationPolicies.UserOrAdmin)]
     [ProducesResponseType(typeof(DocumentDetailsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -203,8 +210,10 @@ public class DocumentsController(
     /// <returns>No content on successful deletion.</returns>
     /// <response code="204">Document deleted successfully.</response>
     /// <response code="401">Unauthorized (missing or invalid JWT token).</response>
+    /// <response code="403">Forbidden (admin role required).</response>
     /// <response code="404">Document not found or belongs to different tenant.</response>
     [HttpDelete("{id}")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RAG.Application.Services;
+using RAG.Core.Authorization;
 using RAG.Core.Domain;
 
 namespace RAG.API.Controllers;
@@ -80,8 +81,9 @@ public class HealthController : ControllerBase
     /// </remarks>
     /// <response code="200">Detailed health status retrieved successfully</response>
     /// <response code="401">Unauthorized</response>
+    /// <response code="403">Forbidden (admin role required)</response>
     /// <response code="503">Service unavailable</response>
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpGet("/api/admin/health")]
     [ProducesResponseType(typeof(HealthStatus), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

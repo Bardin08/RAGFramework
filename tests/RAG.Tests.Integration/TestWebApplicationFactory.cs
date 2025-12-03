@@ -123,10 +123,20 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 }
 
 /// <summary>
-/// Test authentication handler that automatically authenticates requests with a tenant_id claim.
+/// Test authentication handler that supports role-based testing.
+/// Uses special Authorization header formats to specify roles:
+/// - "Bearer admin-token" → admin role
+/// - "Bearer user-token" → user role
+/// - "Bearer no-role-token" → authenticated but no roles
+/// - Any other Bearer token → user role (backward compatible)
+/// - No header → unauthenticated
 /// </summary>
 public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
+    // Default tenant ID for tests
+    public static readonly Guid DefaultTenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    public static readonly Guid AlternateTenantId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
@@ -138,23 +148,49 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         // Check if Authorization header is present
-        if (!Request.Headers.ContainsKey("Authorization"))
+        if (!Request.Headers.TryGetValue("Authorization", out var authHeader))
         {
-            // No authorization header - request should be unauthorized
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        // Authorization header present - authenticate the request
-        var claims = new[]
+        var token = authHeader.ToString();
+        if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
-            new Claim(ClaimTypes.Name, "Test User"),
-            new Claim("tenant_id", Guid.NewGuid().ToString())
+            token = token.Substring(7);
+        }
+
+        // Parse token to determine roles and tenant
+        var (roles, tenantId) = ParseToken(token);
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, "Test User"),
+            new(ClaimTypes.NameIdentifier, "test-user-id"),
+            new("tenant_id", tenantId.ToString())
         };
+
+        // Add role claims
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
 
         var identity = new ClaimsIdentity(claims, "Test");
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, "Test");
 
         return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
+
+    private static (string[] roles, Guid tenantId) ParseToken(string token)
+    {
+        return token.ToLower() switch
+        {
+            "admin-token" => (new[] { "admin", "user" }, DefaultTenantId),
+            "user-token" => (new[] { "user" }, DefaultTenantId),
+            "no-role-token" => (Array.Empty<string>(), DefaultTenantId),
+            "cross-tenant-token" => (new[] { "user" }, AlternateTenantId),
+            _ => (new[] { "user" }, DefaultTenantId) // Default to user role for backward compatibility
+        };
     }
 }

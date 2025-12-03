@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using RAG.API.DTOs;
 using RAG.Application.Interfaces;
+using RAG.Core.Authorization;
 using RAG.Core.Configuration;
 using RAG.Infrastructure.Retrievers;
 
@@ -14,7 +15,7 @@ namespace RAG.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = AuthorizationPolicies.UserOrAdmin)]
 public class RetrievalController : ControllerBase
 {
     private readonly BM25Retriever _bm25Retriever;

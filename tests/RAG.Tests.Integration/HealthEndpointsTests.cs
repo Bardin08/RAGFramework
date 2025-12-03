@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using RAG.Core.Domain;
@@ -57,8 +58,8 @@ public class HealthEndpointsTests : IClassFixture<TestWebApplicationFactory>
     [Fact]
     public async Task AdminHealth_ReturnsDetailedJson()
     {
-        // Arrange
-        _client.DefaultRequestHeaders.Add("Authorization", "Bearer dev-test-token-12345");
+        // Arrange - admin-token provides admin role required for /api/admin/health
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "admin-token");
 
         // Act
         var response = await _client.GetAsync("/api/admin/health");
@@ -79,8 +80,8 @@ public class HealthEndpointsTests : IClassFixture<TestWebApplicationFactory>
     [Fact]
     public async Task AdminHealth_ContainsExpectedServices()
     {
-        // Arrange
-        _client.DefaultRequestHeaders.Add("Authorization", "Bearer dev-test-token-12345");
+        // Arrange - admin-token provides admin role required for /api/admin/health
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "admin-token");
 
         // Act
         var response = await _client.GetAsync("/api/admin/health");
@@ -97,8 +98,8 @@ public class HealthEndpointsTests : IClassFixture<TestWebApplicationFactory>
     [Fact]
     public async Task AdminHealth_CachingWorks()
     {
-        // Arrange
-        _client.DefaultRequestHeaders.Add("Authorization", "Bearer dev-test-token-12345");
+        // Arrange - admin-token provides admin role required for /api/admin/health
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "admin-token");
 
         // Act - Make two requests within cache duration (10 seconds)
         var response1 = await _client.GetAsync("/api/admin/health");

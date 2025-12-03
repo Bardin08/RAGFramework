@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using RAG.API.DTOs;
 using RAG.Application.Interfaces;
 using RAG.Application.Services;
+using RAG.Core.Authorization;
 using RAG.Core.Domain;
 using RAG.Core.Enums;
 using RAG.Core.Interfaces;
@@ -28,7 +29,7 @@ namespace RAG.API.Controllers;
 /// </remarks>
 [ApiController]
 [Route("api/query")]
-[Authorize]
+[Authorize(Policy = AuthorizationPolicies.UserOrAdmin)]
 public class QueryStreamController : ControllerBase
 {
     private readonly ILLMProvider _llmProvider;

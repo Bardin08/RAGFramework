@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using RAG.API.DTOs;
 using RAG.Application.Interfaces;
 using RAG.Application.Services;
+using RAG.Core.Authorization;
 using RAG.Core.Domain;
 using RAG.Core.Enums;
 using RAG.Core.Interfaces;
@@ -24,7 +25,7 @@ namespace RAG.API.Controllers;
 /// </remarks>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = AuthorizationPolicies.UserOrAdmin)]
 [Produces("application/json")]
 public class QueryController : ControllerBase
 {

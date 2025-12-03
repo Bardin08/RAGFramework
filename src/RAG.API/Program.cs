@@ -11,6 +11,7 @@ using RAG.Application.Reranking;
 using RAG.Application.Services;
 using RAG.Core.Configuration;
 using RAG.Infrastructure.Authentication;
+using RAG.Infrastructure.Authorization;
 using RAG.Infrastructure.Data;
 using RAG.Infrastructure.Middleware;
 using RAG.Infrastructure.Repositories;
@@ -107,7 +108,8 @@ try
                 "TestScheme",
                 options => { });
 
-        builder.Services.AddAuthorization();
+        builder.Services.AddRbacAuthorization();
+        builder.Services.AddAuthorization(options => options.AddRbacPolicies());
     }
     else if (builder.Environment.IsDevelopment())
     {
@@ -151,13 +153,18 @@ try
             Log.Information("Development mode: Both TestScheme and {Provider} JWT authentication enabled", authSettings.Provider);
         }
 
-        // Add policy that accepts either scheme
+        // Add RBAC authorization handlers
+        builder.Services.AddRbacAuthorization();
+
+        // Add policy that accepts either scheme + RBAC policies
         builder.Services.AddAuthorization(options =>
         {
             options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
                 .AddAuthenticationSchemes("TestScheme", JwtBearerDefaults.AuthenticationScheme)
                 .RequireAuthenticatedUser()
                 .Build();
+
+            options.AddRbacPolicies();
         });
 
         Log.Warning("DEVELOPMENT MODE - Multiple auth schemes enabled");
@@ -204,7 +211,9 @@ try
             builder.Services.AddSingleton<IClaimsTransformation>(claimsTransformation);
         }
 
-        builder.Services.AddAuthorization();
+        // Add RBAC authorization handlers and policies
+        builder.Services.AddRbacAuthorization();
+        builder.Services.AddAuthorization(options => options.AddRbacPolicies());
 
         Log.Information("Production authentication configured with provider: {Provider}", authSettings.Provider);
     }
