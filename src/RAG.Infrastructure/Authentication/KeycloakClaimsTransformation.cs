@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Logging;
 
 namespace RAG.Infrastructure.Authentication;
 
@@ -11,6 +12,13 @@ namespace RAG.Infrastructure.Authentication;
 /// </summary>
 public class KeycloakClaimsTransformation : IClaimsTransformation
 {
+    private readonly ILogger<KeycloakClaimsTransformation>? _logger;
+
+    public KeycloakClaimsTransformation(ILogger<KeycloakClaimsTransformation>? logger = null)
+    {
+        _logger = logger;
+    }
+
     /// <summary>
     /// Standard claim types used in the application.
     /// </summary>
@@ -81,12 +89,18 @@ public class KeycloakClaimsTransformation : IClaimsTransformation
                 if (!identity.HasClaim(System.Security.Claims.ClaimTypes.Role, role))
                 {
                     identity.AddClaim(new Claim(System.Security.Claims.ClaimTypes.Role, role));
+                    _logger?.LogDebug("Added realm role claim: {Role}", role);
                 }
             }
+
+            _logger?.LogDebug(
+                "Transformed {RoleCount} realm roles for user {UserId}",
+                realmAccess.Roles.Count,
+                identity.FindFirst(ClaimTypes.UserId)?.Value);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            // Invalid JSON in realm_access claim - skip transformation
+            _logger?.LogWarning(ex, "Invalid JSON in realm_access claim - skipping role transformation");
         }
     }
 
@@ -121,12 +135,18 @@ public class KeycloakClaimsTransformation : IClaimsTransformation
                 if (!identity.HasClaim(System.Security.Claims.ClaimTypes.Role, roleClaim))
                 {
                     identity.AddClaim(new Claim(System.Security.Claims.ClaimTypes.Role, roleClaim));
+                    _logger?.LogDebug("Added resource role claim: {Role}", roleClaim);
                 }
             }
+
+            _logger?.LogDebug(
+                "Transformed {RoleCount} resource roles for client {ClientId}",
+                clientAccess.Roles.Count,
+                clientId);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            // Invalid JSON in resource_access claim - skip transformation
+            _logger?.LogWarning(ex, "Invalid JSON in resource_access claim - skipping role transformation");
         }
     }
 
