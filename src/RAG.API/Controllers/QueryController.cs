@@ -61,13 +61,13 @@ public class QueryController : ControllerBase
     /// <param name="cancellationToken">Cancellation token for async operations.</param>
     /// <returns>Complete RAG response with answer, sources, and performance metadata.</returns>
     /// <response code="200">Returns the answer with sources and metadata</response>
-    /// <response code="400">Invalid request parameters</response>
+    /// <response code="400">Validation errors in request parameters. Returns RFC 7807 Problem Details with field-level errors.</response>
     /// <response code="401">Missing or invalid authentication token</response>
     /// <response code="403">User lacks required permissions</response>
     /// <response code="500">Internal server error during processing</response>
     [HttpPost]
     [ProducesResponseType(typeof(QueryResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]

@@ -1,11 +1,16 @@
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Minio;
 using RAG.API.Authentication;
+using RAG.API.Factories;
 using RAG.API.Filters;
 using RAG.API.Middleware;
+using RAG.API.Validators;
 using RAG.Application.Interfaces;
 using RAG.Application.Reranking;
 using RAG.Application.Services;
@@ -94,6 +99,8 @@ try
         builder.Configuration.GetSection("PromptTemplates"));
     builder.Services.Configure<RAG.Application.Configuration.HallucinationDetectionSettings>(
         builder.Configuration.GetSection("HallucinationDetection"));
+    builder.Services.Configure<ValidationSettings>(
+        builder.Configuration.GetSection(ValidationSettings.SectionName));
 
     // Configure Authentication Settings
     builder.Services.Configure<AuthenticationSettings>(
@@ -221,6 +228,40 @@ try
     // Add services to the container.
     builder.Services.AddControllers();
 
+    // Configure FluentValidation
+    builder.Services.AddValidatorsFromAssemblyContaining<QueryRequestValidator>();
+    builder.Services.AddFluentValidationAutoValidation(config =>
+    {
+        config.DisableDataAnnotationsValidation = true;
+    });
+
+    // Configure custom validation response format (RFC 7807 Problem Details)
+    builder.Services.Configure<ApiBehaviorOptions>(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    x => ToCamelCase(x.Key),
+                    x => x.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
+                );
+
+            var correlationId = context.HttpContext.Request.Headers
+                .TryGetValue("X-Correlation-ID", out var id) ? id.ToString() : Guid.NewGuid().ToString("N")[..12];
+
+            var problemDetails = ProblemDetailsFactory.CreateValidationProblemDetails(
+                errors,
+                context.HttpContext.Request.Path,
+                correlationId);
+
+            return new BadRequestObjectResult(problemDetails)
+            {
+                ContentTypes = { "application/problem+json" }
+            };
+        };
+    });
+
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
@@ -251,7 +292,24 @@ Supports multi-tenant architecture with role-based access control.
 - Multi-provider LLM support (OpenAI, Ollama)
 - Hybrid search (BM25 + Dense retrieval)
 - Streaming responses
-- Multi-tenant document isolation",
+- Multi-tenant document isolation
+
+## Validation Errors
+All endpoints validate request parameters using FluentValidation.
+Invalid requests return HTTP 400 with RFC 7807 Problem Details:
+```json
+{
+  ""type"": ""https://api.rag.system/errors/validation-failed"",
+  ""title"": ""Validation Failed"",
+  ""status"": 400,
+  ""errors"": {
+    ""query"": [""Query cannot be empty""],
+    ""topK"": [""TopK must be between 1 and 100""]
+  },
+  ""correlationId"": ""abc123def456"",
+  ""timestamp"": ""2024-01-15T10:30:00.000Z""
+}
+```",
             Contact = new Microsoft.OpenApi.Models.OpenApiContact
             {
                 Name = "RAG API Support",
@@ -566,4 +624,15 @@ finally
     Log.CloseAndFlush();
 }
 
-public partial class Program;
+public partial class Program
+{
+    /// <summary>
+    /// Converts a property name to camelCase.
+    /// </summary>
+    internal static string ToCamelCase(string str)
+    {
+        if (string.IsNullOrEmpty(str)) return str;
+        if (str.Length == 1) return str.ToLowerInvariant();
+        return char.ToLowerInvariant(str[0]) + str[1..];
+    }
+}
