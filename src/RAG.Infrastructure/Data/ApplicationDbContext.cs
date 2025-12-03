@@ -35,6 +35,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<DocumentHash> DocumentHashes { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets the AuditLogs DbSet.
+    /// </summary>
+    public DbSet<AuditLogEntry> AuditLogs { get; set; } = null!;
+
+    /// <summary>
     /// Configures the model for the database.
     /// </summary>
     /// <param name="modelBuilder">The builder being used to construct the model for this context.</param>
@@ -194,6 +199,60 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => new { e.Hash, e.TenantId })
                 .IsUnique()
                 .HasDatabaseName("idx_hash_tenant");
+        });
+
+        modelBuilder.Entity<AuditLogEntry>(entity =>
+        {
+            entity.ToTable("audit_logs");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Timestamp)
+                .IsRequired()
+                .HasColumnName("timestamp");
+
+            entity.Property(e => e.UserId)
+                .IsRequired()
+                .HasMaxLength(255)
+                .HasColumnName("user_id");
+
+            entity.Property(e => e.UserName)
+                .HasMaxLength(255)
+                .HasColumnName("user_name");
+
+            entity.Property(e => e.Action)
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnName("action");
+
+            entity.Property(e => e.Resource)
+                .IsRequired()
+                .HasMaxLength(255)
+                .HasColumnName("resource");
+
+            entity.Property(e => e.Details)
+                .HasColumnType("jsonb")
+                .HasColumnName("details");
+
+            entity.Property(e => e.IpAddress)
+                .HasMaxLength(45)
+                .HasColumnName("ip_address");
+
+            entity.Property(e => e.StatusCode)
+                .HasColumnName("status_code");
+
+            entity.Property(e => e.DurationMs)
+                .HasColumnName("duration_ms");
+
+            // Indexes for common queries
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("idx_audit_logs_user");
+
+            entity.HasIndex(e => e.Action)
+                .HasDatabaseName("idx_audit_logs_action");
+
+            entity.HasIndex(e => e.Timestamp)
+                .HasDatabaseName("idx_audit_logs_timestamp");
         });
     }
 }
