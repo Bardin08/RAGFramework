@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using RAG.API.Authentication;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Integration.Authentication;
 

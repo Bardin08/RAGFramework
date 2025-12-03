@@ -5,7 +5,6 @@ using RAG.Application.Configuration;
 using RAG.Application.Models;
 using RAG.Application.Services;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Services;
 

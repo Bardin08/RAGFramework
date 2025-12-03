@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using RAG.Core.Configuration;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Configuration;
 

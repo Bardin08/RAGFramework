@@ -1,10 +1,16 @@
+// This exception has been moved to RAG.Core.Exceptions.ForbiddenException
+// This file is kept for backwards compatibility but should be removed in future refactoring
+using CoreForbiddenException = RAG.Core.Exceptions.ForbiddenException;
+
 namespace RAG.Application.Exceptions;
 
 /// <summary>
 /// Exception thrown when a user attempts to access a resource they are not authorized to access.
 /// Results in HTTP 403 Forbidden response.
+/// DEPRECATED: Use RAG.Core.Exceptions.ForbiddenException instead.
 /// </summary>
-public class ForbiddenException : Exception
+[Obsolete("Use RAG.Core.Exceptions.ForbiddenException instead")]
+public class ForbiddenException : CoreForbiddenException
 {
     /// <summary>
     /// Default error message for forbidden access.
@@ -18,11 +24,6 @@ public class ForbiddenException : Exception
 
     public ForbiddenException(string message)
         : base(message)
-    {
-    }
-
-    public ForbiddenException(string message, Exception innerException)
-        : base(message, innerException)
     {
     }
 }

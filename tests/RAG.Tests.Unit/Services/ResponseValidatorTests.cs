@@ -3,7 +3,6 @@ using Moq;
 using RAG.Application.Services;
 using RAG.Core.Domain;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Services;
 

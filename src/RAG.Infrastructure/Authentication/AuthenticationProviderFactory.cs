@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using RAG.Application.Interfaces;
 
 namespace RAG.Infrastructure.Authentication;
 

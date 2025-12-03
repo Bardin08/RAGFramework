@@ -27,6 +27,7 @@
     <ProjectReference Include="..\..\src\RAG.Core\RAG.Core.csproj" />
     <ProjectReference Include="..\..\src\RAG.Application\RAG.Application.csproj" />
     <ProjectReference Include="..\..\src\RAG.Infrastructure\RAG.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\RAG.API\RAG.API.csproj" />
   </ItemGroup>
 
 </Project>

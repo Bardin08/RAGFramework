@@ -1,12 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.Extensions.DependencyInjection;
-using Moq;
 using RAG.API.DTOs;
-using RAG.Application.Interfaces;
-using RAG.Core.Domain;
-using RAG.Infrastructure.Retrievers;
 using Shouldly;
 
 namespace RAG.Tests.Integration.Controllers;

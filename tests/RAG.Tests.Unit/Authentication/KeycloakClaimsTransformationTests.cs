@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using RAG.Infrastructure.Authentication;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Authentication;
 

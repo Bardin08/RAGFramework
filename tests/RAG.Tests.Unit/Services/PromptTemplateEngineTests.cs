@@ -4,7 +4,6 @@ using Moq;
 using RAG.Application.Configuration;
 using RAG.Application.Services;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Services;
 
