@@ -25,7 +25,7 @@ namespace RAG.Application.Reranking;
 ///   RRF = 1/(60+2) = 0.0161
 /// Final ranking: A (0.0323) > B (0.0161)
 ///
-/// Reference: Cormack, G. V., Clarke, C. L., & Buettcher, S. (2009).
+/// Reference: Cormack, G. V., Clarke, C. L., and Buettcher, S. (2009).
 /// "Reciprocal Rank Fusion outperforms Condorcet and individual rank learning methods."
 /// Proceedings of SIGIR 2009.
 /// </remarks>

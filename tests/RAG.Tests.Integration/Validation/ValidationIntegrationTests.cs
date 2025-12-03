@@ -37,7 +37,7 @@ public class ValidationIntegrationTests : IClassFixture<TestWebApplicationFactor
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         // Content type can be application/json or application/problem+json
         response.Content.Headers.ContentType?.MediaType.ShouldNotBeNull();
-        response.Content.Headers.ContentType!.MediaType.ShouldContain("json");
+        response.Content.Headers.ContentType!.MediaType!.ShouldContain("json");
 
         var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
         problemDetails.ShouldNotBeNull();
