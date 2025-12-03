@@ -5,7 +5,6 @@ using RAG.Application.Services;
 using RAG.Core.Domain;
 using RAG.Core.Interfaces;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Integration.LLMProviders;
 

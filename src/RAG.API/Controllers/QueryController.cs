@@ -11,7 +11,6 @@ using RAG.Core.Interfaces;
 using RAG.Infrastructure.Factories;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 
 namespace RAG.API.Controllers;
 

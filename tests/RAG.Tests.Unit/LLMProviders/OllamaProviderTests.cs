@@ -8,7 +8,6 @@ using RAG.Infrastructure.LLMProviders;
 using Shouldly;
 using System.Net;
 using System.Text;
-using Xunit;
 
 namespace RAG.Tests.Unit.LLMProviders;
 

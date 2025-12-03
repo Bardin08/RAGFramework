@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using RAG.Infrastructure.Authentication;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Authentication;
 

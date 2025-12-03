@@ -6,6 +6,7 @@ using RAG.API.Models.Responses;
 using RAG.Application.Interfaces;
 using RAG.Core.Authorization;
 using RAG.Core.Domain.Enums;
+using RAG.Core.Exceptions;
 
 namespace RAG.API.Controllers;
 
@@ -173,7 +174,7 @@ public class DocumentsController(
 
         if (document == null)
         {
-            return NotFound();
+            throw new NotFoundException("Document", id);
         }
 
         var chunks = await documentRepository.GetDocumentChunksAsync(id, tenantId, cancellationToken);
@@ -229,7 +230,7 @@ public class DocumentsController(
 
         if (!deleted)
         {
-            return NotFound();
+            throw new NotFoundException("Document", id);
         }
 
         return NoContent();

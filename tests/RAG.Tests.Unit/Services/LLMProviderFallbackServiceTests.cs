@@ -1,11 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Moq;
-using Polly.CircuitBreaker;
 using RAG.Application.Services;
 using RAG.Core.Domain;
 using RAG.Core.Interfaces;
 using Shouldly;
-using Xunit;
 
 namespace RAG.Tests.Unit.Services;
 

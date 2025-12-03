@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +6,7 @@ using RAG.API.DTOs;
 using RAG.Application.Interfaces;
 using RAG.Core.Configuration;
 using RAG.Infrastructure.Retrievers;
+using CoreValidationException = RAG.Core.Exceptions.ValidationException;
 
 namespace RAG.API.Controllers;
 
@@ -75,166 +75,95 @@ public class HybridRetrievalController : ControllerBase
         [FromBody] HybridRetrievalRequest request,
         CancellationToken cancellationToken = default)
     {
+        // Validate weight constraints - throw exception, middleware handles response
         try
         {
-            // Validate weight constraints
-            try
+            request.ValidateWeights();
+        }
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
+        {
+            throw new CoreValidationException("weights", ex.Message);
+        }
+
+        // Extract tenant ID from the current context
+        var tenantId = _tenantContext.GetTenantId();
+
+        // Use default TopK if not specified
+        var topK = request.TopK ?? 10;
+
+        // Use config alpha/beta if not specified in request
+        var alpha = request.Alpha ?? _config.Alpha;
+        var beta = request.Beta ?? _config.Beta;
+
+        _logger.LogInformation(
+            "Hybrid search initiated: query='{Query}', topK={TopK}, alpha={Alpha}, beta={Beta}, tenantId={TenantId}",
+            request.Query, topK, alpha, beta, tenantId);
+
+        // Execute search with timing - exceptions propagate to middleware
+        var stopwatch = Stopwatch.StartNew();
+        var results = await _hybridRetriever.SearchAsync(
+            request.Query,
+            topK,
+            tenantId,
+            cancellationToken);
+        stopwatch.Stop();
+
+        // Map domain results to DTOs
+        var resultDtos = results.Select(r =>
+        {
+            double? bm25Score = null;
+            double? denseScore = null;
+
+            if (r.Metadata != null)
             {
-                request.ValidateWeights();
+                if (r.Metadata.TryGetValue("BM25Score", out var bm25Obj) && bm25Obj is double bm25Val)
+                    bm25Score = bm25Val;
+
+                if (r.Metadata.TryGetValue("DenseScore", out var denseObj) && denseObj is double denseVal)
+                    denseScore = denseVal;
             }
-            catch (ValidationException ex)
-            {
-                _logger.LogWarning(ex,
-                    "Invalid weights in hybrid request: alpha={Alpha}, beta={Beta}",
-                    request.Alpha, request.Beta);
 
-                return BadRequest(new ProblemDetails
-                {
-                    Status = StatusCodes.Status400BadRequest,
-                    Title = "Invalid request",
-                    Detail = ex.Message,
-                    Instance = HttpContext.Request.Path
-                });
-            }
-
-            // Extract tenant ID from the current context
-            var tenantId = _tenantContext.GetTenantId();
-
-            // Use default TopK if not specified
-            var topK = request.TopK ?? 10;
-
-            // Use config alpha/beta if not specified in request
-            var alpha = request.Alpha ?? _config.Alpha;
-            var beta = request.Beta ?? _config.Beta;
-
-            _logger.LogInformation(
-                "Hybrid search initiated: query='{Query}', topK={TopK}, alpha={Alpha}, beta={Beta}, tenantId={TenantId}",
-                request.Query, topK, alpha, beta, tenantId);
-
-            // Execute search with timing
-            var stopwatch = Stopwatch.StartNew();
-            var results = await _hybridRetriever.SearchAsync(
-                request.Query,
-                topK,
-                tenantId,
-                cancellationToken);
-            stopwatch.Stop();
-
-            // Map domain results to DTOs
-            // Extract individual BM25/Dense scores from result metadata
-            var resultDtos = results.Select(r =>
-            {
-                double? bm25Score = null;
-                double? denseScore = null;
-
-                if (r.Metadata != null)
-                {
-                    if (r.Metadata.TryGetValue("BM25Score", out var bm25Obj) && bm25Obj is double bm25Val)
-                        bm25Score = bm25Val;
-
-                    if (r.Metadata.TryGetValue("DenseScore", out var denseObj) && denseObj is double denseVal)
-                        denseScore = denseVal;
-                }
-
-                return new HybridRetrievalResultDto(
-                    DocumentId: r.DocumentId,
-                    Score: r.Score,
-                    Text: r.Text,
-                    Source: r.Source,
-                    HighlightedText: r.HighlightedText,
-                    BM25Score: bm25Score, // Original normalized BM25 score (if present)
-                    DenseScore: denseScore, // Original Dense score (if present)
-                    CombinedScore: r.Score // Final score after weighted combination or RRF
-                );
-            }).ToList();
-
-            // Create metadata showing how retrievers contributed
-            // Result counts reflect counts BEFORE deduplication
-            var metadata = new HybridRetrievalMetadata(
-                Alpha: alpha,
-                Beta: beta,
-                RerankingMethod: _config.RerankingMethod,
-                BM25ResultCount: _hybridRetriever.LastBM25ResultCount,
-                DenseResultCount: _hybridRetriever.LastDenseResultCount
+            return new HybridRetrievalResultDto(
+                DocumentId: r.DocumentId,
+                Score: r.Score,
+                Text: r.Text,
+                Source: r.Source,
+                HighlightedText: r.HighlightedText,
+                BM25Score: bm25Score,
+                DenseScore: denseScore,
+                CombinedScore: r.Score
             );
+        }).ToList();
 
-            var response = new HybridRetrievalResponse(
-                Results: resultDtos,
-                TotalFound: results.Count,
-                RetrievalTimeMs: stopwatch.Elapsed.TotalMilliseconds,
-                Strategy: _hybridRetriever.GetStrategyName(),
-                Metadata: metadata
-            );
+        // Create metadata
+        var metadata = new HybridRetrievalMetadata(
+            Alpha: alpha,
+            Beta: beta,
+            RerankingMethod: _config.RerankingMethod,
+            BM25ResultCount: _hybridRetriever.LastBM25ResultCount,
+            DenseResultCount: _hybridRetriever.LastDenseResultCount
+        );
 
-            _logger.LogInformation(
-                "Hybrid search completed: query='{Query}', results={ResultCount}, timeMs={TimeMs}, rerankingMethod={RerankingMethod}, tenantId={TenantId}",
-                request.Query, results.Count, stopwatch.Elapsed.TotalMilliseconds, _config.RerankingMethod, tenantId);
+        var response = new HybridRetrievalResponse(
+            Results: resultDtos,
+            TotalFound: results.Count,
+            RetrievalTimeMs: stopwatch.Elapsed.TotalMilliseconds,
+            Strategy: _hybridRetriever.GetStrategyName(),
+            Metadata: metadata
+        );
 
-            // Validate performance target (log warning if > 300ms)
-            if (stopwatch.Elapsed.TotalMilliseconds > 300)
-            {
-                _logger.LogWarning(
-                    "Hybrid search exceeded performance target: query='{Query}', timeMs={TimeMs} (target: <300ms)",
-                    request.Query, stopwatch.Elapsed.TotalMilliseconds);
-            }
+        _logger.LogInformation(
+            "Hybrid search completed: query='{Query}', results={ResultCount}, timeMs={TimeMs}, rerankingMethod={RerankingMethod}, tenantId={TenantId}",
+            request.Query, results.Count, stopwatch.Elapsed.TotalMilliseconds, _config.RerankingMethod, tenantId);
 
-            return Ok(response);
-        }
-        catch (ArgumentException ex)
+        // Validate performance target (log warning if > 300ms)
+        if (stopwatch.Elapsed.TotalMilliseconds > 300)
         {
-            _logger.LogWarning(ex,
-                "Invalid hybrid request: query='{Query}', message={Message}",
-                request.Query, ex.Message);
-
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Invalid request",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
+            _logger.LogWarning(
+                "Hybrid search exceeded performance target: query='{Query}', timeMs={TimeMs} (target: <300ms)",
+                request.Query, stopwatch.Elapsed.TotalMilliseconds);
         }
-        catch (TimeoutException ex)
-        {
-            _logger.LogError(ex,
-                "Hybrid search timeout: query='{Query}'",
-                request.Query);
 
-            return StatusCode(StatusCodes.Status504GatewayTimeout, new ProblemDetails
-            {
-                Status = StatusCodes.Status504GatewayTimeout,
-                Title = "Request timeout",
-                Detail = "Hybrid search operation timed out. Please try again with a simpler query.",
-                Instance = HttpContext.Request.Path
-            });
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogError(ex,
-                "Hybrid search service unavailable: query='{Query}', message={Message}",
-                request.Query, ex.Message);
-
-            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
-            {
-                Status = StatusCodes.Status500InternalServerError,
-                Title = "Service unavailable",
-                Detail = "Hybrid search service is currently unavailable. Please try again later.",
-                Instance = HttpContext.Request.Path
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex,
-                "Unexpected error during hybrid search: query='{Query}'",
-                request.Query);
-
-            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
-            {
-                Status = StatusCodes.Status500InternalServerError,
-                Title = "Internal server error",
-                Detail = "An unexpected error occurred while processing the request.",
-                Instance = HttpContext.Request.Path
-            });
-        }
+        return Ok(response);
     }
 }
