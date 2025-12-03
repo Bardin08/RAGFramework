@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RAG.API.DTOs;
@@ -28,9 +29,11 @@ namespace RAG.API.Controllers;
 /// - error: Error information if something goes wrong
 /// </remarks>
 [ApiController]
-[Route("api/query")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/query")]
+[Route("api/query")] // Backward compatibility
 [Authorize(Policy = AuthorizationPolicies.UserOrAdmin)]
-public class QueryStreamController : ControllerBase
+public class QueryStreamController : ApiControllerBase
 {
     private readonly ILLMProvider _llmProvider;
     private readonly RetrievalStrategyFactory _retrievalStrategyFactory;

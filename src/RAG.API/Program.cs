@@ -1,11 +1,18 @@
+using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Minio;
 using RAG.API.Authentication;
+using RAG.API.Factories;
 using RAG.API.Filters;
 using RAG.API.Middleware;
+using RAG.API.Validators;
 using RAG.Application.Interfaces;
 using RAG.Application.Reranking;
 using RAG.Application.Services;
@@ -18,6 +25,8 @@ using RAG.Infrastructure.Repositories;
 using RAG.Infrastructure.Retrievers;
 using RAG.Infrastructure.Services;
 using RAG.Infrastructure.Storage;
+using RAG.Infrastructure.RateLimiting;
+using AspNetCoreRateLimit;
 using Serilog;
 using Serilog.Events;
 
@@ -94,6 +103,16 @@ try
         builder.Configuration.GetSection("PromptTemplates"));
     builder.Services.Configure<RAG.Application.Configuration.HallucinationDetectionSettings>(
         builder.Configuration.GetSection("HallucinationDetection"));
+    builder.Services.Configure<ValidationSettings>(
+        builder.Configuration.GetSection(ValidationSettings.SectionName));
+
+    // Configure Rate Limiting Settings
+    builder.Services.Configure<RateLimitSettings>(
+        builder.Configuration.GetSection(RateLimitSettings.SectionName));
+
+    // Configure CORS Settings
+    builder.Services.Configure<CorsSettings>(
+        builder.Configuration.GetSection(CorsSettings.SectionName));
 
     // Configure Authentication Settings
     builder.Services.Configure<AuthenticationSettings>(
@@ -221,6 +240,57 @@ try
     // Add services to the container.
     builder.Services.AddControllers();
 
+    // Configure FluentValidation
+    builder.Services.AddValidatorsFromAssemblyContaining<QueryRequestValidator>();
+    builder.Services.AddFluentValidationAutoValidation(config =>
+    {
+        config.DisableDataAnnotationsValidation = true;
+    });
+
+    // Configure custom validation response format (RFC 7807 Problem Details)
+    builder.Services.Configure<ApiBehaviorOptions>(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    x => ToCamelCase(x.Key),
+                    x => x.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
+                );
+
+            var correlationId = context.HttpContext.Request.Headers
+                .TryGetValue("X-Correlation-ID", out var id) ? id.ToString() : Guid.NewGuid().ToString("N")[..12];
+
+            var problemDetails = ProblemDetailsFactory.CreateValidationProblemDetails(
+                errors,
+                context.HttpContext.Request.Path,
+                correlationId);
+
+            return new BadRequestObjectResult(problemDetails)
+            {
+                ContentTypes = { "application/problem+json" }
+            };
+        };
+    });
+
+    // Configure API versioning
+    builder.Services.Configure<ApiVersionSettings>(
+        builder.Configuration.GetSection(ApiVersionSettings.SectionName));
+
+    builder.Services.AddApiVersioning(options =>
+    {
+        options.DefaultApiVersion = new ApiVersion(1, 0);
+        options.AssumeDefaultVersionWhenUnspecified = true;
+        options.ReportApiVersions = true;
+        options.ApiVersionReader = new UrlSegmentApiVersionReader();
+    })
+    .AddApiExplorer(options =>
+    {
+        options.GroupNameFormat = "'v'VVV";
+        options.SubstituteApiVersionInUrl = true;
+    });
+
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
@@ -251,7 +321,52 @@ Supports multi-tenant architecture with role-based access control.
 - Multi-provider LLM support (OpenAI, Ollama)
 - Hybrid search (BM25 + Dense retrieval)
 - Streaming responses
-- Multi-tenant document isolation",
+- Multi-tenant document isolation
+
+## Rate Limiting
+This API implements rate limiting to protect resources and ensure fair usage.
+
+### Rate Limit Tiers
+| Tier | Limit | Description |
+|------|-------|-------------|
+| Anonymous | 100/min | Unauthenticated requests |
+| Authenticated | 200/min | Users with valid JWT token |
+| Admin | 500/min | Users with admin role |
+
+### Rate Limit Headers
+All responses include the following headers:
+- `X-RateLimit-Limit`: Maximum requests allowed per time window
+- `X-RateLimit-Remaining`: Remaining requests in current window
+- `X-RateLimit-Reset`: Unix timestamp when the limit resets
+
+### Rate Limit Exceeded (429)
+When rate limit is exceeded, the API returns HTTP 429 with RFC 7807 Problem Details:
+```json
+{
+  ""type"": ""https://api.rag.system/errors/rate-limit-exceeded"",
+  ""title"": ""Rate limit exceeded"",
+  ""status"": 429,
+  ""detail"": ""You have exceeded the rate limit. Try again later."",
+  ""retryAfter"": ""60""
+}
+```
+
+## Validation Errors
+All endpoints validate request parameters using FluentValidation.
+Invalid requests return HTTP 400 with RFC 7807 Problem Details:
+```json
+{
+  ""type"": ""https://api.rag.system/errors/validation-failed"",
+  ""title"": ""Validation Failed"",
+  ""status"": 400,
+  ""errors"": {
+    ""query"": [""Query cannot be empty""],
+    ""topK"": [""TopK must be between 1 and 100""]
+  },
+  ""correlationId"": ""abc123def456"",
+  ""timestamp"": ""2024-01-15T10:30:00.000Z""
+}
+```",
             Contact = new Microsoft.OpenApi.Models.OpenApiContact
             {
                 Name = "RAG API Support",
@@ -271,8 +386,58 @@ Supports multi-tenant architecture with role-based access control.
             options.IncludeXmlComments(xmlPath);
         }
 
+        // Include XML comments from Application and Core assemblies
+        var applicationXmlPath = Path.Combine(AppContext.BaseDirectory, "RAG.Application.xml");
+        if (File.Exists(applicationXmlPath))
+        {
+            options.IncludeXmlComments(applicationXmlPath);
+        }
+
+        var coreXmlPath = Path.Combine(AppContext.BaseDirectory, "RAG.Core.xml");
+        if (File.Exists(coreXmlPath))
+        {
+            options.IncludeXmlComments(coreXmlPath);
+        }
+
         // Add support for file uploads in Swagger UI
         options.OperationFilter<SwaggerFileOperationFilter>();
+
+        // Add authorization information to operation descriptions
+        options.OperationFilter<AddAuthorizationHeaderOperationFilter>();
+
+        // Add response headers documentation
+        options.OperationFilter<AddResponseHeadersOperationFilter>();
+
+        // Handle multiple routes with API versioning
+        options.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
+
+        // Configure operation tags for grouping endpoints by controller (ignore API version group)
+        options.TagActionsBy(api =>
+        {
+            var controllerName = api.ActionDescriptor.RouteValues["controller"];
+            return controllerName switch
+            {
+                "Query" => new[] { "Query" },
+                "QueryStream" => new[] { "Query" },
+                "Documents" => new[] { "Documents" },
+                "Retrieval" => new[] { "Retrieval" },
+                "HybridRetrieval" => new[] { "Retrieval" },
+                "Health" => new[] { "Health" },
+                _ => new[] { controllerName ?? "Other" }
+            };
+        });
+
+        // Add tag descriptions
+        options.DocumentFilter<SwaggerTagDescriptionsDocumentFilter>();
+
+        // Remove non-versioned routes from documentation (show only /api/v1/... routes)
+        options.DocumentFilter<RemoveNonVersionedRoutesDocumentFilter>();
+
+        // Convert all routes to lowercase for consistency
+        options.DocumentFilter<LowercaseRoutesDocumentFilter>();
+
+        // Enable annotations for additional metadata
+        options.EnableAnnotations();
 
         // Add authentication support to Swagger UI
         options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
@@ -470,6 +635,89 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
     builder.Services.AddMemoryCache();
     builder.Services.AddScoped<IHealthCheckService, HealthCheckService>();
 
+    // Configure Rate Limiting (AspNetCoreRateLimit) - only if configuration exists and enabled
+    // Tests can opt-out by setting environment variable DisableRateLimiting=true
+    var ipRateLimitSection = builder.Configuration.GetSection("IpRateLimiting");
+    var disableRateLimiting = builder.Configuration.GetValue<bool>("DisableRateLimiting");
+    var enableEndpointRateLimiting = ipRateLimitSection.GetValue<bool>("EnableEndpointRateLimiting");
+    var rateLimitingEnabled = !disableRateLimiting &&
+                              ipRateLimitSection.Exists() &&
+                              ipRateLimitSection.GetChildren().Any() &&
+                              enableEndpointRateLimiting;
+
+    if (rateLimitingEnabled)
+    {
+        // IP-based rate limiting
+        builder.Services.Configure<IpRateLimitOptions>(ipRateLimitSection);
+        builder.Services.Configure<IpRateLimitPolicies>(builder.Configuration.GetSection("IpRateLimitPolicies"));
+
+        // Client-based rate limiting
+        builder.Services.Configure<ClientRateLimitOptions>(builder.Configuration.GetSection("ClientRateLimiting"));
+        builder.Services.Configure<ClientRateLimitPolicies>(builder.Configuration.GetSection("ClientRateLimitPolicies"));
+
+        // Register rate limit stores and configuration
+        builder.Services.AddInMemoryRateLimiting();
+        builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+
+        // Register custom role-based client resolver for authenticated users
+        builder.Services.AddSingleton<IClientResolveContributor, RoleBasedClientResolveContributor>();
+    }
+
+    // Configure CORS (Story 6.9)
+    var corsSettings = builder.Configuration.GetSection(CorsSettings.SectionName).Get<CorsSettings>()
+                       ?? new CorsSettings();
+
+    // Fallback defaults when not configured in appsettings
+    var allowedMethods = corsSettings.AllowedMethods.Length > 0
+        ? corsSettings.AllowedMethods
+        : new[] { "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH" };
+
+    var allowedHeaders = corsSettings.AllowedHeaders.Length > 0
+        ? corsSettings.AllowedHeaders
+        : new[] { "Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin" };
+
+    var exposedHeaders = corsSettings.ExposedHeaders.Length > 0
+        ? corsSettings.ExposedHeaders
+        : new[] { "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "X-Request-Id", "api-supported-versions", "api-deprecated-versions" };
+
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            // Configure allowed origins
+            if (corsSettings.AllowedOrigins.Length > 0)
+            {
+                policy.WithOrigins(corsSettings.AllowedOrigins);
+            }
+            else if (builder.Environment.IsDevelopment())
+            {
+                // Fallback for development: common localhost ports
+                policy.WithOrigins(
+                    "http://localhost:3000",
+                    "http://localhost:5173",
+                    "http://localhost:8080");
+            }
+
+            // Configure allowed methods
+            policy.WithMethods(allowedMethods);
+
+            // Configure allowed headers
+            policy.WithHeaders(allowedHeaders);
+
+            // Configure exposed headers (rate limit, API versioning, request ID)
+            policy.WithExposedHeaders(exposedHeaders);
+
+            // Configure credentials support
+            if (corsSettings.AllowCredentials)
+            {
+                policy.AllowCredentials();
+            }
+
+            // Configure preflight cache duration
+            policy.SetPreflightMaxAge(TimeSpan.FromSeconds(corsSettings.MaxAgeSeconds));
+        });
+    });
+
     var app = builder.Build();
 
     // Validate and log configuration (skip in test environments)
@@ -495,6 +743,17 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
     // Add exception handling middleware (must be early in pipeline)
     app.UseMiddleware<ExceptionHandlingMiddleware>();
 
+    // Add rate limiting middleware only if rate limiting is configured
+    if (rateLimitingEnabled)
+    {
+        // Add custom rate limit exceeded response middleware (transforms 429 to RFC 7807)
+        app.UseMiddleware<RateLimitExceededMiddleware>();
+
+        // Add IP-based rate limiting middleware (before authentication)
+        // Rate limiting is applied based on client IP address
+        app.UseIpRateLimiting();
+    }
+
     // Add Serilog request logging
     app.UseSerilogRequestLogging(options =>
     {
@@ -510,9 +769,36 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     {
-        app.UseSwagger();
-        app.UseSwaggerUI();
+        app.UseSwagger(options =>
+        {
+            options.RouteTemplate = "swagger/{documentName}/swagger.json";
+        });
+
+        app.UseSwaggerUI(options =>
+        {
+            options.SwaggerEndpoint("/swagger/v1/swagger.json", "RAG API v1");
+            options.RoutePrefix = "swagger";
+            options.DocumentTitle = "RAG Architecture API Documentation";
+
+            // UI Enhancements
+            options.DefaultModelsExpandDepth(2);
+            options.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
+            options.EnableDeepLinking();
+            options.DisplayRequestDuration();
+            options.EnableFilter();
+            options.ShowExtensions();
+
+            // Try-it-out
+            options.EnableTryItOutByDefault();
+
+            // Persist authorization across page refreshes
+            options.ConfigObject.AdditionalItems.Add("persistAuthorization", "true");
+        });
     }
+
+    // Add CORS middleware (Story 6.9)
+    // Must be after routing setup, before authentication
+    app.UseCors();
 
     app.UseAuthentication();
     app.UseTenantContext();
@@ -566,4 +852,15 @@ finally
     Log.CloseAndFlush();
 }
 
-public partial class Program;
+public partial class Program
+{
+    /// <summary>
+    /// Converts a property name to camelCase.
+    /// </summary>
+    internal static string ToCamelCase(string str)
+    {
+        if (string.IsNullOrEmpty(str)) return str;
+        if (str.Length == 1) return str.ToLowerInvariant();
+        return char.ToLowerInvariant(str[0]) + str[1..];
+    }
+}

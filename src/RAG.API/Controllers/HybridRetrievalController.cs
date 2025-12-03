@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -14,9 +15,11 @@ namespace RAG.API.Controllers;
 /// Handles hybrid retrieval operations combining BM25 and Dense strategies.
 /// </summary>
 [ApiController]
-[Route("api/retrieval/hybrid")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/retrieval/hybrid")]
+[Route("api/retrieval/hybrid")] // Backward compatibility
 [Authorize]
-public class HybridRetrievalController : ControllerBase
+public class HybridRetrievalController : ApiControllerBase
 {
     private readonly HybridRetriever _hybridRetriever;
     private readonly ITenantContext _tenantContext;
