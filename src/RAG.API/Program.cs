@@ -348,11 +348,58 @@ Invalid requests return HTTP 400 with RFC 7807 Problem Details:
             options.IncludeXmlComments(xmlPath);
         }
 
+        // Include XML comments from Application and Core assemblies
+        var applicationXmlPath = Path.Combine(AppContext.BaseDirectory, "RAG.Application.xml");
+        if (File.Exists(applicationXmlPath))
+        {
+            options.IncludeXmlComments(applicationXmlPath);
+        }
+
+        var coreXmlPath = Path.Combine(AppContext.BaseDirectory, "RAG.Core.xml");
+        if (File.Exists(coreXmlPath))
+        {
+            options.IncludeXmlComments(coreXmlPath);
+        }
+
         // Add support for file uploads in Swagger UI
         options.OperationFilter<SwaggerFileOperationFilter>();
 
+        // Add authorization information to operation descriptions
+        options.OperationFilter<AddAuthorizationHeaderOperationFilter>();
+
+        // Add response headers documentation
+        options.OperationFilter<AddResponseHeadersOperationFilter>();
+
         // Handle multiple routes with API versioning
         options.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
+
+        // Configure operation tags for grouping endpoints by controller (ignore API version group)
+        options.TagActionsBy(api =>
+        {
+            var controllerName = api.ActionDescriptor.RouteValues["controller"];
+            return controllerName switch
+            {
+                "Query" => new[] { "Query" },
+                "QueryStream" => new[] { "Query" },
+                "Documents" => new[] { "Documents" },
+                "Retrieval" => new[] { "Retrieval" },
+                "HybridRetrieval" => new[] { "Retrieval" },
+                "Health" => new[] { "Health" },
+                _ => new[] { controllerName ?? "Other" }
+            };
+        });
+
+        // Add tag descriptions
+        options.DocumentFilter<SwaggerTagDescriptionsDocumentFilter>();
+
+        // Remove non-versioned routes from documentation (show only /api/v1/... routes)
+        options.DocumentFilter<RemoveNonVersionedRoutesDocumentFilter>();
+
+        // Convert all routes to lowercase for consistency
+        options.DocumentFilter<LowercaseRoutesDocumentFilter>();
+
+        // Enable annotations for additional metadata
+        options.EnableAnnotations();
 
         // Add authentication support to Swagger UI
         options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
@@ -590,8 +637,31 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     {
-        app.UseSwagger();
-        app.UseSwaggerUI();
+        app.UseSwagger(options =>
+        {
+            options.RouteTemplate = "swagger/{documentName}/swagger.json";
+        });
+
+        app.UseSwaggerUI(options =>
+        {
+            options.SwaggerEndpoint("/swagger/v1/swagger.json", "RAG API v1");
+            options.RoutePrefix = "swagger";
+            options.DocumentTitle = "RAG Architecture API Documentation";
+
+            // UI Enhancements
+            options.DefaultModelsExpandDepth(2);
+            options.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
+            options.EnableDeepLinking();
+            options.DisplayRequestDuration();
+            options.EnableFilter();
+            options.ShowExtensions();
+
+            // Try-it-out
+            options.EnableTryItOutByDefault();
+
+            // Persist authorization across page refreshes
+            options.ConfigObject.AdditionalItems.Add("persistAuthorization", "true");
+        });
     }
 
     app.UseAuthentication();
