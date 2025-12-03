@@ -66,7 +66,7 @@ public class ExceptionHandlingMiddlewareTests
         problemDetails.ShouldNotBeNull();
         problemDetails.Status.ShouldBe(404);
         problemDetails.Title.ShouldBe("Not Found");
-        problemDetails.Type.ShouldContain("not-found");
+        problemDetails.Type!.ShouldContain("not-found");
     }
 
     [Fact]
@@ -229,7 +229,7 @@ public class ExceptionHandlingMiddlewareTests
         var problemDetails = await GetProblemDetailsFromResponse(context);
         problemDetails.ShouldNotBeNull();
         problemDetails.Status.ShouldBe(500);
-        problemDetails.Detail.ShouldNotContain("Something went wrong"); // Hidden in production
+        problemDetails.Detail!.ShouldNotContain("Something went wrong"); // Hidden in production
         problemDetails.Extensions.ShouldNotContainKey("exception");
     }
 

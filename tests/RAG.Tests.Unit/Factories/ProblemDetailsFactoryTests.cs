@@ -26,7 +26,7 @@ public class ProblemDetailsFactoryTests
         result.Title.ShouldBe(title);
         result.Detail.ShouldBe(detail);
         result.Instance.ShouldBe(instance);
-        result.Type.ShouldContain("404");
+        result.Type!.ShouldContain("404");
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class ProblemDetailsFactoryTests
         result.Status.ShouldBe(404);
         result.Title.ShouldBe("Not Found");
         result.Detail.ShouldBe(exception.Message);
-        result.Type.ShouldContain(exception.ErrorCode);
+        result.Type!.ShouldContain(exception.ErrorCode);
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public class ProblemDetailsFactoryTests
         // Assert
         result.Status.ShouldBe(StatusCodes.Status400BadRequest);
         result.Title.ShouldBe("Validation Failed");
-        result.Type.ShouldContain(ErrorCodes.ValidationFailed);
+        result.Type!.ShouldContain(ErrorCodes.ValidationFailed);
         result.Extensions.ShouldContainKey("errors");
     }
 
@@ -165,7 +165,7 @@ public class ProblemDetailsFactoryTests
 
         // Assert
         result.Status.ShouldBe(500);
-        result.Detail.ShouldNotContain("Sensitive error message");
+        result.Detail!.ShouldNotContain("Sensitive error message");
         result.Extensions.ShouldNotContainKey("exception");
     }
 
@@ -179,7 +179,7 @@ public class ProblemDetailsFactoryTests
         var result = ProblemDetailsFactory.CreateInternalError(exception, "/api/test", includeDetails: true);
 
         // Assert
-        result.Detail.ShouldContain("Error message");
+        result.Detail!.ShouldContain("Error message");
         result.Extensions.ShouldContainKey("exception");
     }
 
@@ -197,7 +197,7 @@ public class ProblemDetailsFactoryTests
             includeDetails: false);
 
         // Assert
-        result.Detail.ShouldContain($"Reference: {correlationId}");
+        result.Detail!.ShouldContain($"Reference: {correlationId}");
     }
 
     [Fact]
