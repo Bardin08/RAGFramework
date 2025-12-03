@@ -110,6 +110,10 @@ try
     builder.Services.Configure<RateLimitSettings>(
         builder.Configuration.GetSection(RateLimitSettings.SectionName));
 
+    // Configure CORS Settings
+    builder.Services.Configure<CorsSettings>(
+        builder.Configuration.GetSection(CorsSettings.SectionName));
+
     // Configure Authentication Settings
     builder.Services.Configure<AuthenticationSettings>(
         builder.Configuration.GetSection(AuthenticationSettings.SectionName));
@@ -659,6 +663,61 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
         builder.Services.AddSingleton<IClientResolveContributor, RoleBasedClientResolveContributor>();
     }
 
+    // Configure CORS (Story 6.9)
+    var corsSettings = builder.Configuration.GetSection(CorsSettings.SectionName).Get<CorsSettings>()
+                       ?? new CorsSettings();
+
+    // Fallback defaults when not configured in appsettings
+    var allowedMethods = corsSettings.AllowedMethods.Length > 0
+        ? corsSettings.AllowedMethods
+        : new[] { "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH" };
+
+    var allowedHeaders = corsSettings.AllowedHeaders.Length > 0
+        ? corsSettings.AllowedHeaders
+        : new[] { "Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin" };
+
+    var exposedHeaders = corsSettings.ExposedHeaders.Length > 0
+        ? corsSettings.ExposedHeaders
+        : new[] { "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "X-Request-Id", "api-supported-versions", "api-deprecated-versions" };
+
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            // Configure allowed origins
+            if (corsSettings.AllowedOrigins.Length > 0)
+            {
+                policy.WithOrigins(corsSettings.AllowedOrigins);
+            }
+            else if (builder.Environment.IsDevelopment())
+            {
+                // Fallback for development: common localhost ports
+                policy.WithOrigins(
+                    "http://localhost:3000",
+                    "http://localhost:5173",
+                    "http://localhost:8080");
+            }
+
+            // Configure allowed methods
+            policy.WithMethods(allowedMethods);
+
+            // Configure allowed headers
+            policy.WithHeaders(allowedHeaders);
+
+            // Configure exposed headers (rate limit, API versioning, request ID)
+            policy.WithExposedHeaders(exposedHeaders);
+
+            // Configure credentials support
+            if (corsSettings.AllowCredentials)
+            {
+                policy.AllowCredentials();
+            }
+
+            // Configure preflight cache duration
+            policy.SetPreflightMaxAge(TimeSpan.FromSeconds(corsSettings.MaxAgeSeconds));
+        });
+    });
+
     var app = builder.Build();
 
     // Validate and log configuration (skip in test environments)
@@ -736,6 +795,10 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
             options.ConfigObject.AdditionalItems.Add("persistAuthorization", "true");
         });
     }
+
+    // Add CORS middleware (Story 6.9)
+    // Must be after routing setup, before authentication
+    app.UseCors();
 
     app.UseAuthentication();
     app.UseTenantContext();
