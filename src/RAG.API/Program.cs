@@ -1,3 +1,5 @@
+using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
@@ -262,6 +264,23 @@ try
         };
     });
 
+    // Configure API versioning
+    builder.Services.Configure<ApiVersionSettings>(
+        builder.Configuration.GetSection(ApiVersionSettings.SectionName));
+
+    builder.Services.AddApiVersioning(options =>
+    {
+        options.DefaultApiVersion = new ApiVersion(1, 0);
+        options.AssumeDefaultVersionWhenUnspecified = true;
+        options.ReportApiVersions = true;
+        options.ApiVersionReader = new UrlSegmentApiVersionReader();
+    })
+    .AddApiExplorer(options =>
+    {
+        options.GroupNameFormat = "'v'VVV";
+        options.SubstituteApiVersionInUrl = true;
+    });
+
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
@@ -331,6 +350,9 @@ Invalid requests return HTTP 400 with RFC 7807 Problem Details:
 
         // Add support for file uploads in Swagger UI
         options.OperationFilter<SwaggerFileOperationFilter>();
+
+        // Handle multiple routes with API versioning
+        options.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
 
         // Add authentication support to Swagger UI
         options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
@@ -23,10 +24,12 @@ namespace RAG.API.Controllers;
 /// Users must have the 'query' role to access this endpoint.
 /// </remarks>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
+[Route("api/[controller]")] // Backward compatibility
 [Authorize(Policy = AuthorizationPolicies.UserOrAdmin)]
 [Produces("application/json")]
-public class QueryController : ControllerBase
+public class QueryController : ApiControllerBase
 {
     private readonly ILLMProvider _llmProvider;
     private readonly RetrievalStrategyFactory _retrievalStrategyFactory;

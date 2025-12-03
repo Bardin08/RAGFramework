@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RAG.API.Extensions;
@@ -14,7 +15,9 @@ namespace RAG.API.Controllers;
 /// Controller for document management operations.
 /// </summary>
 [ApiController]
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
+[Route("api/[controller]")] // Backward compatibility
 [Authorize]
 public class DocumentsController(
     IFileUploadService fileUploadService,

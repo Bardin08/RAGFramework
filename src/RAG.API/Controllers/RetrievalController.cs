@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -15,9 +16,11 @@ namespace RAG.API.Controllers;
 /// Exceptions are handled by ExceptionHandlingMiddleware.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
+[Route("api/[controller]")] // Backward compatibility
 [Authorize(Policy = AuthorizationPolicies.UserOrAdmin)]
-public class RetrievalController : ControllerBase
+public class RetrievalController : ApiControllerBase
 {
     private readonly BM25Retriever _bm25Retriever;
     private readonly DenseRetriever _denseRetriever;
