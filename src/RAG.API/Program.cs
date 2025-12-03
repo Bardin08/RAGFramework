@@ -25,6 +25,8 @@ using RAG.Infrastructure.Repositories;
 using RAG.Infrastructure.Retrievers;
 using RAG.Infrastructure.Services;
 using RAG.Infrastructure.Storage;
+using RAG.Infrastructure.RateLimiting;
+using AspNetCoreRateLimit;
 using Serilog;
 using Serilog.Events;
 
@@ -103,6 +105,10 @@ try
         builder.Configuration.GetSection("HallucinationDetection"));
     builder.Services.Configure<ValidationSettings>(
         builder.Configuration.GetSection(ValidationSettings.SectionName));
+
+    // Configure Rate Limiting Settings
+    builder.Services.Configure<RateLimitSettings>(
+        builder.Configuration.GetSection(RateLimitSettings.SectionName));
 
     // Configure Authentication Settings
     builder.Services.Configure<AuthenticationSettings>(
@@ -312,6 +318,34 @@ Supports multi-tenant architecture with role-based access control.
 - Hybrid search (BM25 + Dense retrieval)
 - Streaming responses
 - Multi-tenant document isolation
+
+## Rate Limiting
+This API implements rate limiting to protect resources and ensure fair usage.
+
+### Rate Limit Tiers
+| Tier | Limit | Description |
+|------|-------|-------------|
+| Anonymous | 100/min | Unauthenticated requests |
+| Authenticated | 200/min | Users with valid JWT token |
+| Admin | 500/min | Users with admin role |
+
+### Rate Limit Headers
+All responses include the following headers:
+- `X-RateLimit-Limit`: Maximum requests allowed per time window
+- `X-RateLimit-Remaining`: Remaining requests in current window
+- `X-RateLimit-Reset`: Unix timestamp when the limit resets
+
+### Rate Limit Exceeded (429)
+When rate limit is exceeded, the API returns HTTP 429 with RFC 7807 Problem Details:
+```json
+{
+  ""type"": ""https://api.rag.system/errors/rate-limit-exceeded"",
+  ""title"": ""Rate limit exceeded"",
+  ""status"": 429,
+  ""detail"": ""You have exceeded the rate limit. Try again later."",
+  ""retryAfter"": ""60""
+}
+```
 
 ## Validation Errors
 All endpoints validate request parameters using FluentValidation.
@@ -597,6 +631,34 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
     builder.Services.AddMemoryCache();
     builder.Services.AddScoped<IHealthCheckService, HealthCheckService>();
 
+    // Configure Rate Limiting (AspNetCoreRateLimit) - only if configuration exists and enabled
+    // Tests can opt-out by setting environment variable DisableRateLimiting=true
+    var ipRateLimitSection = builder.Configuration.GetSection("IpRateLimiting");
+    var disableRateLimiting = builder.Configuration.GetValue<bool>("DisableRateLimiting");
+    var enableEndpointRateLimiting = ipRateLimitSection.GetValue<bool>("EnableEndpointRateLimiting");
+    var rateLimitingEnabled = !disableRateLimiting &&
+                              ipRateLimitSection.Exists() &&
+                              ipRateLimitSection.GetChildren().Any() &&
+                              enableEndpointRateLimiting;
+
+    if (rateLimitingEnabled)
+    {
+        // IP-based rate limiting
+        builder.Services.Configure<IpRateLimitOptions>(ipRateLimitSection);
+        builder.Services.Configure<IpRateLimitPolicies>(builder.Configuration.GetSection("IpRateLimitPolicies"));
+
+        // Client-based rate limiting
+        builder.Services.Configure<ClientRateLimitOptions>(builder.Configuration.GetSection("ClientRateLimiting"));
+        builder.Services.Configure<ClientRateLimitPolicies>(builder.Configuration.GetSection("ClientRateLimitPolicies"));
+
+        // Register rate limit stores and configuration
+        builder.Services.AddInMemoryRateLimiting();
+        builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+
+        // Register custom role-based client resolver for authenticated users
+        builder.Services.AddSingleton<IClientResolveContributor, RoleBasedClientResolveContributor>();
+    }
+
     var app = builder.Build();
 
     // Validate and log configuration (skip in test environments)
@@ -621,6 +683,17 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
 
     // Add exception handling middleware (must be early in pipeline)
     app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+    // Add rate limiting middleware only if rate limiting is configured
+    if (rateLimitingEnabled)
+    {
+        // Add custom rate limit exceeded response middleware (transforms 429 to RFC 7807)
+        app.UseMiddleware<RateLimitExceededMiddleware>();
+
+        // Add IP-based rate limiting middleware (before authentication)
+        // Rate limiting is applied based on client IP address
+        app.UseIpRateLimiting();
+    }
 
     // Add Serilog request logging
     app.UseSerilogRequestLogging(options =>

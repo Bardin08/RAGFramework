@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
@@ -22,6 +23,17 @@ public class SwaggerTestWebApplicationFactory : TestWebApplicationFactory
 
         // Override to use Development environment so Swagger is enabled
         builder.UseEnvironment("Development");
+
+        // Ensure rate limiting is disabled for Swagger tests
+        // This must be added after environment change to override appsettings.json values
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            var disableRateLimiting = new Dictionary<string, string?>
+            {
+                ["DisableRateLimiting"] = "true"
+            };
+            config.AddInMemoryCollection(disableRateLimiting);
+        });
     }
 }
 

@@ -23,6 +23,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Set environment variable to disable rate limiting (takes precedence over appsettings.json)
+        Environment.SetEnvironmentVariable("DisableRateLimiting", "true");
+
         // Set environment to Testing to skip startup initialization
         builder.UseEnvironment("Testing");
 
@@ -71,7 +74,11 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                 ["RRF:K"] = "60",
                 ["LLMProviders:Default"] = "OpenAI",
                 ["PromptTemplates:SystemPrompt"] = "Test",
-                ["HallucinationDetection:Enabled"] = "false"
+                ["HallucinationDetection:Enabled"] = "false",
+
+                // Explicitly disable rate limiting for tests
+                // Rate limiting tests use their own factory with explicit configuration
+                ["DisableRateLimiting"] = "true"
             };
 
             config.AddInMemoryCollection(testConfig);
