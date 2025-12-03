@@ -635,6 +635,14 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
     builder.Services.AddMemoryCache();
     builder.Services.AddScoped<IHealthCheckService, HealthCheckService>();
 
+    // Register Admin services (Story 6.7)
+    builder.Services.AddSingleton<System.Threading.Channels.Channel<RAG.Core.Domain.IndexRebuildJob>>(
+        System.Threading.Channels.Channel.CreateUnbounded<RAG.Core.Domain.IndexRebuildJob>());
+    builder.Services.AddSingleton<System.Collections.Concurrent.ConcurrentDictionary<Guid, RAG.Core.Domain.IndexRebuildJob>>();
+    builder.Services.AddScoped<RAG.Application.Interfaces.IAdminService, RAG.Infrastructure.Services.AdminService>();
+    builder.Services.AddScoped<RAG.Application.Interfaces.IAuditLogService, RAG.Infrastructure.Services.AuditLogService>();
+    builder.Services.AddHostedService<RAG.Infrastructure.BackgroundServices.IndexRebuildBackgroundService>();
+
     // Configure Rate Limiting (AspNetCoreRateLimit) - only if configuration exists and enabled
     // Tests can opt-out by setting environment variable DisableRateLimiting=true
     var ipRateLimitSection = builder.Configuration.GetSection("IpRateLimiting");
