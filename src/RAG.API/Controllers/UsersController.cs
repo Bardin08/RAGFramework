@@ -57,7 +57,7 @@ public class UsersController(
         {
             Id = u.Id,
             Name = u.Name,
-            Email = u.Email,
+            Email = u.Email ?? string.Empty,
             Username = u.Username
         }).ToList();
 

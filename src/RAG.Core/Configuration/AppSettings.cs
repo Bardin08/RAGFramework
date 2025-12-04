@@ -254,6 +254,49 @@ public class KeycloakSettings
     /// </summary>
     [Required]
     public string Audience { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the Keycloak Admin API settings.
+    /// </summary>
+    public KeycloakAdminSettings Admin { get; set; } = new();
+}
+
+/// <summary>
+/// Configuration settings for Keycloak Admin API access.
+/// </summary>
+public class KeycloakAdminSettings
+{
+    /// <summary>
+    /// Gets or sets the Keycloak base URL (without /realms/...).
+    /// Example: http://localhost:8080
+    /// </summary>
+    public string BaseUrl { get; set; } = "http://localhost:8080";
+
+    /// <summary>
+    /// Gets or sets the realm name.
+    /// </summary>
+    public string Realm { get; set; } = "rag";
+
+    /// <summary>
+    /// Gets or sets the client ID for Admin API access.
+    /// This client must have service account enabled with realm-management roles.
+    /// </summary>
+    public string ClientId { get; set; } = "rag-api";
+
+    /// <summary>
+    /// Gets or sets the client secret for Admin API access.
+    /// </summary>
+    public string ClientSecret { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets whether user lookup is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the cache duration for user information in seconds.
+    /// </summary>
+    public int CacheDurationSeconds { get; set; } = 300;
 }
 
 /// <summary>
