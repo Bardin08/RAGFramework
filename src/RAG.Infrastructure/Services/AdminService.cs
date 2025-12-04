@@ -14,6 +14,7 @@ namespace RAG.Infrastructure.Services;
 
 /// <summary>
 /// Implementation of administrative operations service.
+/// Jobs are stored in database for persistent tracking across application restarts.
 /// </summary>
 public class AdminService : IAdminService
 {
@@ -22,7 +23,7 @@ public class AdminService : IAdminService
     private readonly IMemoryCache _memoryCache;
     private readonly ILogger<AdminService> _logger;
     private readonly Channel<IndexRebuildJob> _jobQueue;
-    private readonly ConcurrentDictionary<Guid, IndexRebuildJob> _jobTracker;
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _cancellationTokens;
 
     private static readonly DateTime _startTime = DateTime.UtcNow;
 
@@ -31,15 +32,14 @@ public class AdminService : IAdminService
         IHealthCheckService healthCheckService,
         IMemoryCache memoryCache,
         ILogger<AdminService> logger,
-        Channel<IndexRebuildJob> jobQueue,
-        ConcurrentDictionary<Guid, IndexRebuildJob> jobTracker)
+        Channel<IndexRebuildJob> jobQueue)
     {
         _dbContext = dbContext;
         _healthCheckService = healthCheckService;
         _memoryCache = memoryCache;
         _logger = logger;
         _jobQueue = jobQueue;
-        _jobTracker = jobTracker;
+        _cancellationTokens = new ConcurrentDictionary<Guid, CancellationTokenSource>();
     }
 
     /// <inheritdoc/>
@@ -97,20 +97,28 @@ public class AdminService : IAdminService
         }
         var estimatedDocuments = await query.CountAsync(cancellationToken);
 
+        var cts = new CancellationTokenSource();
         var job = new IndexRebuildJob
         {
             TenantId = request.TenantId,
             IncludeEmbeddings = request.IncludeEmbeddings,
             EstimatedDocuments = estimatedDocuments,
-            CancellationTokenSource = new CancellationTokenSource()
+            InitiatedBy = request.InitiatedBy,
+            CancellationTokenSource = cts
         };
 
-        _jobTracker[job.JobId] = job;
+        // Store in database for persistent tracking
+        _dbContext.IndexRebuildJobs.Add(job);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Store cancellation token in memory (not persisted)
+        _cancellationTokens[job.JobId] = cts;
 
         // Queue the job for background processing
         await _jobQueue.Writer.WriteAsync(job, cancellationToken);
 
-        _logger.LogInformation("Index rebuild job queued. JobId: {JobId}, EstimatedDocuments: {EstimatedDocuments}",
+        _logger.LogInformation(
+            "Index rebuild job queued and saved to database. JobId: {JobId}, EstimatedDocuments: {EstimatedDocuments}",
             job.JobId, estimatedDocuments);
 
         return new IndexRebuildResponse
@@ -124,17 +132,35 @@ public class AdminService : IAdminService
     }
 
     /// <inheritdoc/>
-    public Task<IndexRebuildResponse?> GetRebuildStatusAsync(
+    public async Task<IndexRebuildResponse?> GetRebuildStatusAsync(
         Guid jobId,
         CancellationToken cancellationToken = default)
     {
-        if (!_jobTracker.TryGetValue(jobId, out var job))
+        _logger.LogInformation("Looking up job {JobId} from database", jobId);
+
+        // Debug: Log total count of jobs in the database
+        var totalJobs = await _dbContext.IndexRebuildJobs.CountAsync(cancellationToken);
+        _logger.LogInformation("Total jobs in database: {TotalJobs}", totalJobs);
+
+        // Debug: Log all job IDs in the database
+        var allJobIds = await _dbContext.IndexRebuildJobs
+            .Select(j => j.JobId)
+            .ToListAsync(cancellationToken);
+        _logger.LogInformation("All job IDs in database: {JobIds}", string.Join(", ", allJobIds));
+
+        var job = await _dbContext.IndexRebuildJobs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(j => j.JobId == jobId, cancellationToken);
+
+        if (job == null)
         {
-            _logger.LogWarning("Index rebuild job not found: {JobId}", jobId);
-            return Task.FromResult<IndexRebuildResponse?>(null);
+            _logger.LogWarning("Index rebuild job not found in database: {JobId}", jobId);
+            return null;
         }
 
-        return Task.FromResult<IndexRebuildResponse?>(new IndexRebuildResponse
+        _logger.LogInformation("Found job {JobId} with status {Status}", jobId, job.Status);
+
+        return new IndexRebuildResponse
         {
             JobId = job.JobId,
             Status = job.Status,
@@ -143,7 +169,7 @@ public class AdminService : IAdminService
             StartedAt = job.StartedAt,
             CompletedAt = job.CompletedAt,
             Error = job.Error
-        });
+        };
     }
 
     /// <inheritdoc/>

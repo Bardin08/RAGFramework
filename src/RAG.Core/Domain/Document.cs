@@ -51,6 +51,16 @@ public class Document
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
+    /// The user who owns this document (uploaded it).
+    /// </summary>
+    public Guid OwnerId { get; init; }
+
+    /// <summary>
+    /// Whether this document is publicly accessible to all tenant users.
+    /// </summary>
+    public bool IsPublic { get; set; }
+
+    /// <summary>
     /// Parameterless constructor for EF Core.
     /// </summary>
     private Document()
@@ -65,8 +75,18 @@ public class Document
     /// <summary>
     /// Creates a new Document instance with validation.
     /// </summary>
-    public Document(Guid id, string title, string content, Guid tenantId, string? source = null,
-        Dictionary<string, object>? metadata = null, List<Guid>? chunkIds = null, DateTime? createdAt = null, DateTime? updatedAt = null)
+    public Document(
+        Guid id,
+        string title,
+        string content,
+        Guid tenantId,
+        Guid ownerId,
+        string? source = null,
+        Dictionary<string, object>? metadata = null,
+        List<Guid>? chunkIds = null,
+        DateTime? createdAt = null,
+        DateTime? updatedAt = null,
+        bool isPublic = false)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Document ID cannot be empty", nameof(id));
@@ -80,14 +100,19 @@ public class Document
         if (tenantId == Guid.Empty)
             throw new ArgumentException("Tenant ID cannot be empty", nameof(tenantId));
 
+        if (ownerId == Guid.Empty)
+            throw new ArgumentException("Owner ID cannot be empty", nameof(ownerId));
+
         Id = id;
         Title = title;
         Content = content;
         TenantId = tenantId;
+        OwnerId = ownerId;
         Source = source;
         Metadata = metadata ?? new Dictionary<string, object>();
         ChunkIds = chunkIds ?? new List<Guid>();
         CreatedAt = createdAt ?? DateTime.UtcNow;
         UpdatedAt = updatedAt ?? DateTime.UtcNow;
+        IsPublic = isPublic;
     }
 }

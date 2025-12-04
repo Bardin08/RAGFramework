@@ -48,6 +48,7 @@ public class DocumentIndexingService : IDocumentIndexingService
     public async Task IndexDocumentAsync(
         Guid documentId,
         Guid tenantId,
+        Guid ownerId,
         string fileName,
         string title,
         string? source = null,
@@ -56,8 +57,8 @@ public class DocumentIndexingService : IDocumentIndexingService
         var overallStopwatch = Stopwatch.StartNew();
 
         _logger.LogInformation(
-            "Starting indexing pipeline for document {DocumentId} (tenant {TenantId}, file {FileName})",
-            documentId, tenantId, fileName);
+            "Starting indexing pipeline for document {DocumentId} (tenant {TenantId}, owner {OwnerId}, file {FileName})",
+            documentId, tenantId, ownerId, fileName);
 
         List<DocumentChunk>? chunks = null;
         bool elasticsearchIndexed = false;
@@ -80,7 +81,7 @@ public class DocumentIndexingService : IDocumentIndexingService
 
             // Step 5: Save Document and Chunks to PostgreSQL
             databaseSaved = await SaveToDatabase(
-                documentId, tenantId, title, source ?? fileName, text, chunks, cancellationToken);
+                documentId, tenantId, ownerId, title, source ?? fileName, text, chunks, cancellationToken);
 
             // Step 6: Index chunks in Elasticsearch (with error handling)
             elasticsearchIndexed = await IndexInElasticsearchAsync(chunks, cancellationToken);
@@ -367,6 +368,7 @@ public class DocumentIndexingService : IDocumentIndexingService
     private async Task<bool> SaveToDatabase(
         Guid documentId,
         Guid tenantId,
+        Guid ownerId,
         string title,
         string source,
         string content,
@@ -386,6 +388,7 @@ public class DocumentIndexingService : IDocumentIndexingService
                 title: title,
                 content: content,
                 tenantId: tenantId,
+                ownerId: ownerId,
                 source: source,
                 metadata: new Dictionary<string, object>
                 {

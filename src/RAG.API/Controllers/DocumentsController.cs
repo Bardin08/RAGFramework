@@ -24,6 +24,7 @@ public class DocumentsController(
     IDocumentRepository documentRepository,
     IDocumentDeletionService documentDeletionService,
     IDocumentIndexingService documentIndexingService,
+    IDocumentPermissionService permissionService,
     ITenantContext tenantContext,
     ILogger<DocumentsController> logger) : ControllerBase
 {
@@ -73,13 +74,16 @@ public class DocumentsController(
         // Step 2: Trigger indexing pipeline asynchronously
         try
         {
+            var ownerId = tenantContext.GetUserId();
+
             logger.LogInformation(
-                "Starting indexing pipeline for document {DocumentId} (file: {FileName})",
-                result.DocumentId, request.File.FileName);
+                "Starting indexing pipeline for document {DocumentId} (file: {FileName}, owner: {OwnerId})",
+                result.DocumentId, request.File.FileName, ownerId);
 
             await documentIndexingService.IndexDocumentAsync(
                 result.DocumentId,
                 tenantId,
+                ownerId,
                 request.File.FileName,
                 result.Title,
                 request.Source,
@@ -160,12 +164,13 @@ public class DocumentsController(
     /// <returns>Detailed document information with chunks.</returns>
     /// <response code="200">Returns the document details.</response>
     /// <response code="401">Unauthorized (missing or invalid JWT token).</response>
-    /// <response code="403">Forbidden (user or admin role required).</response>
+    /// <response code="403">Forbidden - no read access to document.</response>
     /// <response code="404">Document not found or belongs to different tenant.</response>
     [HttpGet("{id}")]
     [Authorize(Policy = AuthorizationPolicies.UserOrAdmin)]
     [ProducesResponseType(typeof(DocumentDetailsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<DocumentDetailsResponse>> GetDocument(
         Guid id,
@@ -178,6 +183,18 @@ public class DocumentsController(
         if (document == null)
         {
             throw new NotFoundException("Document", id);
+        }
+
+        // Check read permission using ACL
+        var canRead = await permissionService.CanAccessAsync(
+            id, User, PermissionType.Read, cancellationToken);
+
+        if (!canRead)
+        {
+            logger.LogWarning(
+                "Access denied: User {UserId} lacks read permission for document {DocumentId}",
+                tenantContext.GetUserId(), id);
+            return Forbid();
         }
 
         var chunks = await documentRepository.GetDocumentChunksAsync(id, tenantId, cancellationToken);
@@ -214,12 +231,13 @@ public class DocumentsController(
     /// <returns>No content on successful deletion.</returns>
     /// <response code="204">Document deleted successfully.</response>
     /// <response code="401">Unauthorized (missing or invalid JWT token).</response>
-    /// <response code="403">Forbidden (admin role required).</response>
+    /// <response code="403">Forbidden - admin permission required for document.</response>
     /// <response code="404">Document not found or belongs to different tenant.</response>
     [HttpDelete("{id}")]
-    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+    [Authorize(Policy = AuthorizationPolicies.UserOrAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteDocument(
         Guid id,
@@ -227,6 +245,25 @@ public class DocumentsController(
         CancellationToken cancellationToken)
     {
         var tenantId = tenantContext.GetTenantId();
+
+        // Verify document exists first
+        var document = await documentRepository.GetDocumentByIdAsync(id, tenantId, cancellationToken);
+        if (document == null)
+        {
+            throw new NotFoundException("Document", id);
+        }
+
+        // Check admin permission (owner or explicit admin access or admin role)
+        var canDelete = await permissionService.CanAccessAsync(
+            id, User, PermissionType.Admin, cancellationToken);
+
+        if (!canDelete)
+        {
+            logger.LogWarning(
+                "Delete denied: User {UserId} lacks admin permission for document {DocumentId}",
+                tenantContext.GetUserId(), id);
+            return Forbid();
+        }
 
         var deleted = await documentDeletionService.DeleteDocumentAsync(
             id, tenantId, fileName, cancellationToken);

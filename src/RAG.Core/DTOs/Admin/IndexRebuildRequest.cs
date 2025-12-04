@@ -14,4 +14,9 @@ public class IndexRebuildRequest
     /// Whether to regenerate embeddings during rebuild. Defaults to true.
     /// </summary>
     public bool IncludeEmbeddings { get; init; } = true;
+
+    /// <summary>
+    /// User ID of the person who initiated the rebuild. Set automatically from context.
+    /// </summary>
+    public Guid? InitiatedBy { get; set; }
 }

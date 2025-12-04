@@ -140,9 +140,43 @@ try
 
         var authBuilder = builder.Services.AddAuthentication(options =>
         {
-            // Default to TestScheme for backward compatibility
-            options.DefaultAuthenticateScheme = "TestScheme";
-            options.DefaultChallengeScheme = "TestScheme";
+            // Use a "selector" scheme that picks the right handler based on the token
+            options.DefaultAuthenticateScheme = "DevelopmentSelector";
+            options.DefaultChallengeScheme = "DevelopmentSelector";
+        });
+
+        // Add policy scheme that forwards to the appropriate handler
+        authBuilder.AddPolicyScheme("DevelopmentSelector", "Development Auth Selector", options =>
+        {
+            options.ForwardDefaultSelector = context =>
+            {
+                // Check the Authorization header to determine which scheme to use
+                var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                if (string.IsNullOrEmpty(authHeader))
+                {
+                    return "TestScheme";
+                }
+
+                var token = authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                    ? authHeader.Substring(7)
+                    : authHeader;
+
+                // Known test tokens go to TestScheme
+                var testTokens = new[] { "admin-token", "user-token", "no-role-token", "cross-tenant-token", "dev-test-token-12345" };
+                if (testTokens.Contains(token.ToLowerInvariant()))
+                {
+                    return "TestScheme";
+                }
+
+                // JWT tokens (contain dots) go to JWT Bearer
+                if (token.Contains('.'))
+                {
+                    return JwtBearerDefaults.AuthenticationScheme;
+                }
+
+                // Default to TestScheme
+                return "TestScheme";
+            };
         });
 
         // Add TestScheme
@@ -175,11 +209,10 @@ try
         // Add RBAC authorization handlers
         builder.Services.AddRbacAuthorization();
 
-        // Add policy that accepts either scheme + RBAC policies
+        // Add authorization policies
         builder.Services.AddAuthorization(options =>
         {
             options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-                .AddAuthenticationSchemes("TestScheme", JwtBearerDefaults.AuthenticationScheme)
                 .RequireAuthenticatedUser()
                 .Build();
 
@@ -636,9 +669,9 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
     builder.Services.AddScoped<IHealthCheckService, HealthCheckService>();
 
     // Register Admin services (Story 6.7)
+    // Job queue for background processing - jobs are stored in database for persistence
     builder.Services.AddSingleton<System.Threading.Channels.Channel<RAG.Core.Domain.IndexRebuildJob>>(
         System.Threading.Channels.Channel.CreateUnbounded<RAG.Core.Domain.IndexRebuildJob>());
-    builder.Services.AddSingleton<System.Collections.Concurrent.ConcurrentDictionary<Guid, RAG.Core.Domain.IndexRebuildJob>>();
     builder.Services.AddScoped<RAG.Application.Interfaces.IAdminService, RAG.Infrastructure.Services.AdminService>();
     builder.Services.AddScoped<RAG.Application.Interfaces.IAuditLogService, RAG.Infrastructure.Services.AuditLogService>();
     builder.Services.AddHostedService<RAG.Infrastructure.BackgroundServices.IndexRebuildBackgroundService>();

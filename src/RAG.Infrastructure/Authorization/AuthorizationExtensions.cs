@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using RAG.Application.Interfaces;
 using RAG.Core.Authorization;
+using RAG.Infrastructure.Repositories;
+using RAG.Infrastructure.Services;
 
 namespace RAG.Infrastructure.Authorization;
 
@@ -17,9 +19,15 @@ public static class AuthorizationExtensions
     {
         // Register authorization handlers
         services.AddSingleton<IAuthorizationHandler, TenantAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, DocumentAccessHandler>();
 
-        // Register document authorization service
+        // Register document authorization service (legacy)
         services.AddScoped<IDocumentAuthorizationService, DocumentAuthorizationService>();
+
+        // Register ACL services
+        services.AddScoped<IDocumentAccessRepository, DocumentAccessRepository>();
+        services.AddScoped<IDocumentPermissionService, DocumentPermissionService>();
+        services.AddScoped<IUserLookupService, KeycloakUserLookupService>();
 
         return services;
     }
