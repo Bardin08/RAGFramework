@@ -676,6 +676,9 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
     builder.Services.AddScoped<RAG.Application.Interfaces.IAuditLogService, RAG.Infrastructure.Services.AuditLogService>();
     builder.Services.AddHostedService<RAG.Infrastructure.BackgroundServices.IndexRebuildBackgroundService>();
 
+    // Register User Lookup Service for Keycloak integration
+    builder.Services.AddHttpClient<RAG.Application.Interfaces.IUserLookupService, RAG.Infrastructure.Services.KeycloakUserLookupService>();
+
     // Configure Rate Limiting (AspNetCoreRateLimit) - only if configuration exists and enabled
     // Tests can opt-out by setting environment variable DisableRateLimiting=true
     var ipRateLimitSection = builder.Configuration.GetSection("IpRateLimiting");

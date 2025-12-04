@@ -136,17 +136,7 @@ public class AdminService : IAdminService
         Guid jobId,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Looking up job {JobId} from database", jobId);
-
-        // Debug: Log total count of jobs in the database
-        var totalJobs = await _dbContext.IndexRebuildJobs.CountAsync(cancellationToken);
-        _logger.LogInformation("Total jobs in database: {TotalJobs}", totalJobs);
-
-        // Debug: Log all job IDs in the database
-        var allJobIds = await _dbContext.IndexRebuildJobs
-            .Select(j => j.JobId)
-            .ToListAsync(cancellationToken);
-        _logger.LogInformation("All job IDs in database: {JobIds}", string.Join(", ", allJobIds));
+        _logger.LogDebug("Looking up job {JobId} from database", jobId);
 
         var job = await _dbContext.IndexRebuildJobs
             .AsNoTracking()
@@ -154,11 +144,11 @@ public class AdminService : IAdminService
 
         if (job == null)
         {
-            _logger.LogWarning("Index rebuild job not found in database: {JobId}", jobId);
+            _logger.LogWarning("Index rebuild job not found: {JobId}", jobId);
             return null;
         }
 
-        _logger.LogInformation("Found job {JobId} with status {Status}", jobId, job.Status);
+        _logger.LogDebug("Found job {JobId} with status {Status}", jobId, job.Status);
 
         return new IndexRebuildResponse
         {

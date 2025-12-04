@@ -21,13 +21,16 @@ namespace RAG.API.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly IAdminService _adminService;
+    private readonly ITenantContext _tenantContext;
     private readonly ILogger<AdminController> _logger;
 
     public AdminController(
         IAdminService adminService,
+        ITenantContext tenantContext,
         ILogger<AdminController> logger)
     {
         _adminService = adminService;
+        _tenantContext = tenantContext;
         _logger = logger;
     }
 
@@ -78,8 +81,12 @@ public class AdminController : ControllerBase
         [FromBody] IndexRebuildRequest request,
         CancellationToken cancellationToken)
     {
+        // Set the initiator from authenticated user context
+        request.InitiatedBy = _tenantContext.GetUserId();
+
         _logger.LogInformation(
-            "Index rebuild requested by {User}. TenantId: {TenantId}",
+            "Index rebuild requested by {UserId} ({UserName}). TenantId: {TenantId}",
+            request.InitiatedBy,
             User.Identity?.Name,
             request.TenantId?.ToString() ?? "all");
 
