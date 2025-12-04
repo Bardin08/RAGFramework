@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RAG.Infrastructure.Data;
@@ -11,9 +12,11 @@ using RAG.Infrastructure.Data;
 namespace RAG.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251203221622_AddDocumentAccessControlSchema")]
+    partial class AddDocumentAccessControlSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -348,65 +351,6 @@ namespace RAG.Infrastructure.Migrations
                         .HasDatabaseName("idx_hash_tenant");
 
                     b.ToTable("document_hashes", (string)null);
-                });
-
-            modelBuilder.Entity("RAG.Core.Domain.IndexRebuildJob", b =>
-                {
-                    b.Property<Guid>("JobId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at");
-
-                    b.Property<string>("Error")
-                        .HasColumnType("text")
-                        .HasColumnName("error");
-
-                    b.Property<int>("EstimatedDocuments")
-                        .HasColumnType("integer")
-                        .HasColumnName("estimated_documents");
-
-                    b.Property<bool>("IncludeEmbeddings")
-                        .HasColumnType("boolean")
-                        .HasColumnName("include_embeddings");
-
-                    b.Property<Guid?>("InitiatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("initiated_by");
-
-                    b.Property<int>("ProcessedDocuments")
-                        .HasColumnType("integer")
-                        .HasColumnName("processed_documents");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("JobId");
-
-                    b.HasIndex("StartedAt")
-                        .HasDatabaseName("idx_rebuild_jobs_started_at");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("idx_rebuild_jobs_status");
-
-                    b.HasIndex("TenantId")
-                        .HasDatabaseName("idx_rebuild_jobs_tenant");
-
-                    b.ToTable("index_rebuild_jobs", (string)null);
                 });
 
             modelBuilder.Entity("RAG.Core.Domain.DocumentAccess", b =>

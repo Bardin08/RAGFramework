@@ -52,6 +52,9 @@ public class KeycloakClaimsTransformation : IClaimsTransformation
             return Task.FromResult(principal);
         }
 
+        // Ensure sub claim is mapped to NameIdentifier for GetUserId()
+        EnsureNameIdentifierClaim(identity);
+
         // Transform realm_access.roles to standard role claims
         TransformRealmRoles(identity);
 
@@ -147,6 +150,39 @@ public class KeycloakClaimsTransformation : IClaimsTransformation
         catch (JsonException ex)
         {
             _logger?.LogWarning(ex, "Invalid JSON in resource_access claim - skipping role transformation");
+        }
+    }
+
+    /// <summary>
+    /// Ensures the NameIdentifier claim is present with the user's sub value.
+    /// This is needed because JWT handlers may not map sub to NameIdentifier consistently.
+    /// </summary>
+    private void EnsureNameIdentifierClaim(ClaimsIdentity identity)
+    {
+        // Check if NameIdentifier claim already exists
+        var nameIdentifierClaim = identity.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (nameIdentifierClaim != null)
+        {
+            // Already present, also ensure we have the raw 'sub' claim for compatibility
+            var subClaim = identity.FindFirst(ClaimTypes.UserId);
+            if (subClaim == null)
+            {
+                identity.AddClaim(new Claim(ClaimTypes.UserId, nameIdentifierClaim.Value));
+                _logger?.LogDebug("Added sub claim from NameIdentifier: {UserId}", nameIdentifierClaim.Value);
+            }
+            return;
+        }
+
+        // Try to find the sub claim and map it to NameIdentifier
+        var subClaimValue = identity.FindFirst(ClaimTypes.UserId);
+        if (subClaimValue != null)
+        {
+            identity.AddClaim(new Claim(System.Security.Claims.ClaimTypes.NameIdentifier, subClaimValue.Value));
+            _logger?.LogDebug("Added NameIdentifier claim from sub: {UserId}", subClaimValue.Value);
+        }
+        else
+        {
+            _logger?.LogWarning("No sub or NameIdentifier claim found in token");
         }
     }
 

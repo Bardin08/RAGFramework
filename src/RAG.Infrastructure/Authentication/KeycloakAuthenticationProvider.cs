@@ -53,6 +53,10 @@ public class KeycloakAuthenticationProvider : IAuthenticationProvider
 
         _logger.LogInformation("Configuring Keycloak authentication provider with Authority: {Authority}", _settings.Authority);
 
+        // Clear default claim type mapping to preserve original JWT claim names (sub, preferred_username, etc.)
+        // Without this, 'sub' gets mapped to ClaimTypes.NameIdentifier and 'sub' is not directly accessible
+        JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+
         builder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
         {
             options.Authority = _settings.Authority;

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,22 +11,20 @@ namespace RAG.Infrastructure.BackgroundServices;
 
 /// <summary>
 /// Background service for processing index rebuild jobs.
+/// Jobs are stored in the database for persistent tracking across application restarts.
 /// </summary>
 public class IndexRebuildBackgroundService : BackgroundService
 {
     private readonly Channel<IndexRebuildJob> _jobQueue;
-    private readonly ConcurrentDictionary<Guid, IndexRebuildJob> _jobTracker;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<IndexRebuildBackgroundService> _logger;
 
     public IndexRebuildBackgroundService(
         Channel<IndexRebuildJob> jobQueue,
-        ConcurrentDictionary<Guid, IndexRebuildJob> jobTracker,
         IServiceScopeFactory scopeFactory,
         ILogger<IndexRebuildBackgroundService> logger)
     {
         _jobQueue = jobQueue;
-        _jobTracker = jobTracker;
         _scopeFactory = scopeFactory;
         _logger = logger;
     }
@@ -45,20 +42,54 @@ public class IndexRebuildBackgroundService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unhandled error processing index rebuild job {JobId}", job.JobId);
-                job.Status = "Failed";
-                job.Error = ex.Message;
-                job.CompletedAt = DateTime.UtcNow;
+                await UpdateJobStatusAsync(job.JobId, "Failed", error: ex.Message);
             }
         }
 
         _logger.LogInformation("Index rebuild background service stopped");
     }
 
+    private async Task UpdateJobStatusAsync(
+        Guid jobId,
+        string status,
+        int? processedDocuments = null,
+        int? estimatedDocuments = null,
+        string? error = null)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var job = await dbContext.IndexRebuildJobs.FindAsync(jobId);
+            if (job != null)
+            {
+                job.Status = status;
+                if (processedDocuments.HasValue)
+                    job.ProcessedDocuments = processedDocuments.Value;
+                if (estimatedDocuments.HasValue)
+                    job.EstimatedDocuments = estimatedDocuments.Value;
+                if (error != null)
+                    job.Error = error;
+                if (status is "Completed" or "Failed" or "Cancelled")
+                    job.CompletedAt = DateTime.UtcNow;
+
+                await dbContext.SaveChangesAsync();
+                _logger.LogDebug("Updated job {JobId} status to {Status}", jobId, status);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update job {JobId} status in database", jobId);
+        }
+    }
+
     private async Task ProcessJobAsync(IndexRebuildJob job, CancellationToken stoppingToken)
     {
         _logger.LogInformation("Processing index rebuild job {JobId}", job.JobId);
 
-        job.Status = "InProgress";
+        // Update status to InProgress in database
+        await UpdateJobStatusAsync(job.JobId, "InProgress");
 
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
             stoppingToken,
@@ -81,7 +112,11 @@ public class IndexRebuildBackgroundService : BackgroundService
                 .Select(d => new { d.Id, d.TenantId, d.Title, d.Source })
                 .ToListAsync(linkedCts.Token);
 
-            job.EstimatedDocuments = documents.Count;
+            var estimatedDocuments = documents.Count;
+            var processedDocuments = 0;
+
+            // Update estimated count in database
+            await UpdateJobStatusAsync(job.JobId, "InProgress", estimatedDocuments: estimatedDocuments);
 
             _logger.LogInformation("Reindexing {Count} documents for job {JobId}",
                 documents.Count, job.JobId);
@@ -90,8 +125,7 @@ public class IndexRebuildBackgroundService : BackgroundService
             {
                 if (linkedCts.Token.IsCancellationRequested)
                 {
-                    job.Status = "Cancelled";
-                    job.CompletedAt = DateTime.UtcNow;
+                    await UpdateJobStatusAsync(job.JobId, "Cancelled", processedDocuments: processedDocuments);
                     _logger.LogWarning("Job {JobId} was cancelled", job.JobId);
                     return;
                 }
@@ -103,12 +137,14 @@ public class IndexRebuildBackgroundService : BackgroundService
                     // For now, we increment the counter
                     // In production, you'd call: await indexingService.ReindexDocumentAsync(doc.Id, ...)
 
-                    job.ProcessedDocuments++;
+                    processedDocuments++;
 
-                    if (job.ProcessedDocuments % 10 == 0)
+                    // Update progress every 10 documents
+                    if (processedDocuments % 10 == 0)
                     {
+                        await UpdateJobStatusAsync(job.JobId, "InProgress", processedDocuments: processedDocuments);
                         _logger.LogInformation("Job {JobId}: Processed {Processed}/{Total} documents",
-                            job.JobId, job.ProcessedDocuments, job.EstimatedDocuments);
+                            job.JobId, processedDocuments, estimatedDocuments);
                     }
                 }
                 catch (Exception ex)
@@ -119,23 +155,20 @@ public class IndexRebuildBackgroundService : BackgroundService
                 }
             }
 
-            job.Status = "Completed";
-            job.CompletedAt = DateTime.UtcNow;
+            // Mark as completed
+            await UpdateJobStatusAsync(job.JobId, "Completed", processedDocuments: processedDocuments);
 
             _logger.LogInformation("Job {JobId} completed. Processed {Processed} documents",
-                job.JobId, job.ProcessedDocuments);
+                job.JobId, processedDocuments);
         }
         catch (OperationCanceledException)
         {
-            job.Status = "Cancelled";
-            job.CompletedAt = DateTime.UtcNow;
+            await UpdateJobStatusAsync(job.JobId, "Cancelled");
             _logger.LogWarning("Job {JobId} was cancelled", job.JobId);
         }
         catch (Exception ex)
         {
-            job.Status = "Failed";
-            job.Error = ex.Message;
-            job.CompletedAt = DateTime.UtcNow;
+            await UpdateJobStatusAsync(job.JobId, "Failed", error: ex.Message);
             _logger.LogError(ex, "Job {JobId} failed", job.JobId);
             throw;
         }

@@ -40,6 +40,21 @@ public class ApplicationDbContext : DbContext
     public DbSet<AuditLogEntry> AuditLogs { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets the DocumentAccess DbSet for ACL.
+    /// </summary>
+    public DbSet<DocumentAccess> DocumentAccess { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the AccessAuditLogs DbSet for ACL audit trail.
+    /// </summary>
+    public DbSet<AccessAuditLog> AccessAuditLogs { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the IndexRebuildJobs DbSet for tracking rebuild jobs.
+    /// </summary>
+    public DbSet<IndexRebuildJob> IndexRebuildJobs { get; set; } = null!;
+
+    /// <summary>
     /// Configures the model for the database.
     /// </summary>
     /// <param name="modelBuilder">The builder being used to construct the model for this context.</param>
@@ -98,12 +113,24 @@ public class ApplicationDbContext : DbContext
                 .IsRequired()
                 .HasColumnName("updated_at");
 
+            entity.Property(e => e.OwnerId)
+                .IsRequired()
+                .HasColumnName("owner_id");
+
+            entity.Property(e => e.IsPublic)
+                .IsRequired()
+                .HasDefaultValue(false)
+                .HasColumnName("is_public");
+
             // Indexes
             entity.HasIndex(e => e.TenantId)
                 .HasDatabaseName("idx_documents_tenant_id");
 
             entity.HasIndex(e => e.Title)
                 .HasDatabaseName("idx_documents_title");
+
+            entity.HasIndex(e => e.OwnerId)
+                .HasDatabaseName("idx_documents_owner_id");
         });
 
         modelBuilder.Entity<DocumentChunk>(entity =>
@@ -253,6 +280,155 @@ public class ApplicationDbContext : DbContext
 
             entity.HasIndex(e => e.Timestamp)
                 .HasDatabaseName("idx_audit_logs_timestamp");
+        });
+
+        modelBuilder.Entity<DocumentAccess>(entity =>
+        {
+            entity.ToTable("document_access");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.DocumentId)
+                .IsRequired()
+                .HasColumnName("document_id");
+
+            entity.Property(e => e.UserId)
+                .IsRequired()
+                .HasColumnName("user_id");
+
+            entity.Property(e => e.Permission)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasColumnName("permission_type");
+
+            entity.Property(e => e.GrantedBy)
+                .IsRequired()
+                .HasColumnName("granted_by");
+
+            entity.Property(e => e.GrantedAt)
+                .IsRequired()
+                .HasColumnName("granted_at");
+
+            // Foreign key to documents with cascade delete
+            entity.HasOne<Document>()
+                .WithMany()
+                .HasForeignKey(e => e.DocumentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Unique constraint: one access entry per document-user pair
+            entity.HasIndex(e => new { e.DocumentId, e.UserId })
+                .IsUnique()
+                .HasDatabaseName("idx_document_access_unique");
+
+            entity.HasIndex(e => e.DocumentId)
+                .HasDatabaseName("idx_document_access_document");
+
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("idx_document_access_user");
+
+            entity.HasIndex(e => e.Permission)
+                .HasDatabaseName("idx_document_access_permission");
+        });
+
+        modelBuilder.Entity<AccessAuditLog>(entity =>
+        {
+            entity.ToTable("access_audit_log");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Timestamp)
+                .IsRequired()
+                .HasColumnName("timestamp");
+
+            entity.Property(e => e.ActorUserId)
+                .IsRequired()
+                .HasColumnName("actor_user_id");
+
+            entity.Property(e => e.Action)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasColumnName("action");
+
+            entity.Property(e => e.DocumentId)
+                .IsRequired()
+                .HasColumnName("document_id");
+
+            entity.Property(e => e.TargetUserId)
+                .HasColumnName("target_user_id");
+
+            entity.Property(e => e.PermissionType)
+                .HasMaxLength(20)
+                .HasColumnName("permission_type");
+
+            entity.Property(e => e.Details)
+                .HasColumnType("jsonb")
+                .HasColumnName("details");
+
+            entity.HasIndex(e => e.DocumentId)
+                .HasDatabaseName("idx_access_audit_document");
+
+            entity.HasIndex(e => e.Timestamp)
+                .HasDatabaseName("idx_access_audit_timestamp");
+
+            entity.HasIndex(e => e.ActorUserId)
+                .HasDatabaseName("idx_access_audit_actor");
+        });
+
+        modelBuilder.Entity<IndexRebuildJob>(entity =>
+        {
+            entity.ToTable("index_rebuild_jobs");
+
+            entity.HasKey(e => e.JobId);
+
+            entity.Property(e => e.JobId)
+                .HasColumnName("id");
+
+            entity.Property(e => e.TenantId)
+                .HasColumnName("tenant_id");
+
+            entity.Property(e => e.IncludeEmbeddings)
+                .IsRequired()
+                .HasColumnName("include_embeddings");
+
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasColumnName("status");
+
+            entity.Property(e => e.EstimatedDocuments)
+                .IsRequired()
+                .HasColumnName("estimated_documents");
+
+            entity.Property(e => e.ProcessedDocuments)
+                .IsRequired()
+                .HasColumnName("processed_documents");
+
+            entity.Property(e => e.StartedAt)
+                .IsRequired()
+                .HasColumnName("started_at");
+
+            entity.Property(e => e.CompletedAt)
+                .HasColumnName("completed_at");
+
+            entity.Property(e => e.Error)
+                .HasColumnName("error");
+
+            entity.Property(e => e.InitiatedBy)
+                .HasColumnName("initiated_by");
+
+            // Ignore the CancellationTokenSource - it's not persisted
+            entity.Ignore(e => e.CancellationTokenSource);
+
+            // Indexes
+            entity.HasIndex(e => e.Status)
+                .HasDatabaseName("idx_rebuild_jobs_status");
+
+            entity.HasIndex(e => e.TenantId)
+                .HasDatabaseName("idx_rebuild_jobs_tenant");
+
+            entity.HasIndex(e => e.StartedAt)
+                .HasDatabaseName("idx_rebuild_jobs_started_at");
         });
     }
 }

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -23,7 +22,6 @@ public class AdminServiceTests : IDisposable
     private readonly IMemoryCache _memoryCache;
     private readonly Mock<ILogger<AdminService>> _loggerMock;
     private readonly Channel<IndexRebuildJob> _jobQueue;
-    private readonly ConcurrentDictionary<Guid, IndexRebuildJob> _jobTracker;
     private readonly AdminService _service;
 
     public AdminServiceTests()
@@ -37,15 +35,13 @@ public class AdminServiceTests : IDisposable
         _memoryCache = new MemoryCache(new MemoryCacheOptions());
         _loggerMock = new Mock<ILogger<AdminService>>();
         _jobQueue = Channel.CreateUnbounded<IndexRebuildJob>();
-        _jobTracker = new ConcurrentDictionary<Guid, IndexRebuildJob>();
 
         _service = new AdminService(
             _dbContext,
             _healthCheckServiceMock.Object,
             _memoryCache,
             _loggerMock.Object,
-            _jobQueue,
-            _jobTracker);
+            _jobQueue);
     }
 
     public void Dispose()
@@ -75,8 +71,9 @@ public class AdminServiceTests : IDisposable
     {
         // Arrange
         var tenantId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
         var docId = Guid.NewGuid();
-        var document = new Document(docId, "Test Document", "Test Content", tenantId);
+        var document = new Document(docId, "Test Document", "Test Content", tenantId, ownerId);
         _dbContext.Documents.Add(document);
 
         var chunk = new DocumentChunk(Guid.NewGuid(), docId, "Test chunk", 0, 10, 0, tenantId);
@@ -100,11 +97,12 @@ public class AdminServiceTests : IDisposable
         // Arrange
         var tenant1 = Guid.NewGuid();
         var tenant2 = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
 
         _dbContext.Documents.AddRange(
-            new Document(Guid.NewGuid(), "Doc1", "Content", tenant1),
-            new Document(Guid.NewGuid(), "Doc2", "Content", tenant1),
-            new Document(Guid.NewGuid(), "Doc3", "Content", tenant2)
+            new Document(Guid.NewGuid(), "Doc1", "Content", tenant1, ownerId),
+            new Document(Guid.NewGuid(), "Doc2", "Content", tenant1, ownerId),
+            new Document(Guid.NewGuid(), "Doc3", "Content", tenant2, ownerId)
         );
         await _dbContext.SaveChangesAsync();
 
@@ -138,7 +136,7 @@ public class AdminServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task StartIndexRebuildAsync_TracksJob_InJobTracker()
+    public async Task StartIndexRebuildAsync_PersistsJob_InDatabase()
     {
         // Arrange
         var request = new IndexRebuildRequest();
@@ -147,8 +145,9 @@ public class AdminServiceTests : IDisposable
         var result = await _service.StartIndexRebuildAsync(request);
 
         // Assert
-        _jobTracker.ShouldContainKey(result.JobId);
-        _jobTracker[result.JobId].Status.ShouldBe("Queued");
+        var jobInDb = await _dbContext.IndexRebuildJobs.FindAsync(result.JobId);
+        jobInDb.ShouldNotBeNull();
+        jobInDb!.Status.ShouldBe("Queued");
     }
 
     [Fact]
@@ -171,10 +170,11 @@ public class AdminServiceTests : IDisposable
         // Arrange
         var tenant1 = Guid.NewGuid();
         var tenant2 = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
 
         _dbContext.Documents.AddRange(
-            new Document(Guid.NewGuid(), "Doc1", "Content", tenant1),
-            new Document(Guid.NewGuid(), "Doc2", "Content", tenant2)
+            new Document(Guid.NewGuid(), "Doc1", "Content", tenant1, ownerId),
+            new Document(Guid.NewGuid(), "Doc2", "Content", tenant2, ownerId)
         );
         await _dbContext.SaveChangesAsync();
 

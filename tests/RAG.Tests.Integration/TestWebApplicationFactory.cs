@@ -135,6 +135,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 /// - "Bearer admin-token" → admin role
 /// - "Bearer user-token" → user role
 /// - "Bearer no-role-token" → authenticated but no roles
+/// - "Bearer user-{userId}" → user role with specific user ID
+/// - "Bearer admin-{userId}" → admin role with specific user ID
 /// - Any other Bearer token → user role (backward compatible)
 /// - No header → unauthenticated
 /// </summary>
@@ -143,6 +145,12 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     // Default tenant ID for tests
     public static readonly Guid DefaultTenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     public static readonly Guid AlternateTenantId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+
+    // Default user IDs for tests
+    public static readonly Guid DefaultUserId = Guid.Parse("00000000-0000-0000-0001-000000000001");
+    public static readonly Guid UserAId = Guid.Parse("00000000-0000-0000-0001-000000000002");
+    public static readonly Guid UserBId = Guid.Parse("00000000-0000-0000-0001-000000000003");
+    public static readonly Guid UserCId = Guid.Parse("00000000-0000-0000-0001-000000000004");
 
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -166,13 +174,14 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
             token = token.Substring(7);
         }
 
-        // Parse token to determine roles and tenant
-        var (roles, tenantId) = ParseToken(token);
+        // Parse token to determine roles, tenant, and user ID
+        var (roles, tenantId, userId) = ParseToken(token);
 
         var claims = new List<Claim>
         {
             new(ClaimTypes.Name, "Test User"),
-            new(ClaimTypes.NameIdentifier, "test-user-id"),
+            new(ClaimTypes.NameIdentifier, userId.ToString()),
+            new("sub", userId.ToString()),
             new("tenant_id", tenantId.ToString())
         };
 
@@ -189,15 +198,32 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }
 
-    private static (string[] roles, Guid tenantId) ParseToken(string token)
+    private static (string[] roles, Guid tenantId, Guid userId) ParseToken(string token)
     {
-        return token.ToLower() switch
+        var lowerToken = token.ToLower();
+
+        // Handle user ID specific tokens: user-{guid} or admin-{guid}
+        if (lowerToken.StartsWith("user-") && Guid.TryParse(token.Substring(5), out var userGuid))
         {
-            "admin-token" => (new[] { "admin", "user" }, DefaultTenantId),
-            "user-token" => (new[] { "user" }, DefaultTenantId),
-            "no-role-token" => (Array.Empty<string>(), DefaultTenantId),
-            "cross-tenant-token" => (new[] { "user" }, AlternateTenantId),
-            _ => (new[] { "user" }, DefaultTenantId) // Default to user role for backward compatibility
+            return (new[] { "user" }, DefaultTenantId, userGuid);
+        }
+
+        if (lowerToken.StartsWith("admin-") && Guid.TryParse(token.Substring(6), out var adminGuid))
+        {
+            return (new[] { "admin", "user" }, DefaultTenantId, adminGuid);
+        }
+
+        return lowerToken switch
+        {
+            "admin-token" => (new[] { "admin", "user" }, DefaultTenantId, DefaultUserId),
+            "user-token" => (new[] { "user" }, DefaultTenantId, DefaultUserId),
+            "no-role-token" => (Array.Empty<string>(), DefaultTenantId, DefaultUserId),
+            "cross-tenant-token" => (new[] { "user" }, AlternateTenantId, DefaultUserId),
+            "user-a-token" => (new[] { "user" }, DefaultTenantId, UserAId),
+            "user-b-token" => (new[] { "user" }, DefaultTenantId, UserBId),
+            "user-c-token" => (new[] { "user" }, DefaultTenantId, UserCId),
+            "admin-a-token" => (new[] { "admin", "user" }, DefaultTenantId, UserAId),
+            _ => (new[] { "user" }, DefaultTenantId, DefaultUserId) // Default to user role for backward compatibility
         };
     }
 }

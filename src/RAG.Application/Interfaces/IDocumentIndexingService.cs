@@ -11,6 +11,7 @@ public interface IDocumentIndexingService
     /// </summary>
     /// <param name="documentId">The document ID to process.</param>
     /// <param name="tenantId">The tenant ID.</param>
+    /// <param name="ownerId">The user ID who owns the document.</param>
     /// <param name="fileName">The original file name.</param>
     /// <param name="title">The document title.</param>
     /// <param name="source">The document source.</param>
@@ -19,6 +20,7 @@ public interface IDocumentIndexingService
     Task IndexDocumentAsync(
         Guid documentId,
         Guid tenantId,
+        Guid ownerId,
         string fileName,
         string title,
         string? source = null,

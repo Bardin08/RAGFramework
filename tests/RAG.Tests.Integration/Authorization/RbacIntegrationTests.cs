@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using RAG.Core.Domain;
+using RAG.Infrastructure.Data;
 using Shouldly;
 
 namespace RAG.Tests.Integration.Authorization;
@@ -11,10 +14,12 @@ namespace RAG.Tests.Integration.Authorization;
 /// </summary>
 public class RbacIntegrationTests : IClassFixture<TestWebApplicationFactory>
 {
+    private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
     public RbacIntegrationTests(TestWebApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false
@@ -139,14 +144,28 @@ public class RbacIntegrationTests : IClassFixture<TestWebApplicationFactory>
     [Fact]
     public async Task DocumentsDelete_WithUserToken_Returns403()
     {
-        // Arrange - DELETE requires admin role
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "user-token");
-        var documentId = Guid.NewGuid();
+        // Arrange - Create a document owned by a different user (admin)
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        // Act
+        var documentId = Guid.NewGuid();
+        var document = new Document(
+            id: documentId,
+            title: "Delete Test Document",
+            content: "Test content",
+            tenantId: TestAuthHandler.DefaultTenantId,
+            ownerId: TestAuthHandler.DefaultUserId, // Owned by default user (admin in this context)
+            source: "test");
+
+        dbContext.Documents.Add(document);
+        await dbContext.SaveChangesAsync();
+
+        // Act - User with user-token (different from owner) tries to delete
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "user-b-token");
+
         var response = await _client.DeleteAsync($"/api/v1/documents/{documentId}?fileName=test.txt");
 
-        // Assert
+        // Assert - User without admin permission on document gets 403
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
