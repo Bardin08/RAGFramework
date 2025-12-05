@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RAG.Application\RAG.Application.csproj" />
+    <ProjectReference Include="..\RAG.Evaluation\RAG.Evaluation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

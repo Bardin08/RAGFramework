@@ -31,4 +31,14 @@ public interface IAdminService
     /// Clears specified caches.
     /// </summary>
     Task<CacheClearResponse> ClearCacheAsync(CacheClearRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads a seed dataset for reproducible evaluations.
+    /// </summary>
+    Task<SeedDataResponse> LoadSeedDataAsync(SeedDataRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists available seed datasets.
+    /// </summary>
+    Task<AvailableSeedDatasetsResponse> ListAvailableSeedDatasetsAsync(CancellationToken cancellationToken = default);
 }

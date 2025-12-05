@@ -676,6 +676,16 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
     builder.Services.AddScoped<RAG.Application.Interfaces.IAuditLogService, RAG.Infrastructure.Services.AuditLogService>();
     builder.Services.AddHostedService<RAG.Infrastructure.BackgroundServices.IndexRebuildBackgroundService>();
 
+    // Register Seed Data Loader (Story 7.8)
+    builder.Services.AddScoped<RAG.Application.Interfaces.ISeedDatasetRepository, RAG.Infrastructure.Repositories.SeedDatasetRepository>();
+    builder.Services.AddScoped<RAG.Evaluation.Interfaces.ISeedDataLoader, RAG.Evaluation.Services.SeedDataLoader>();
+
+    // Register Evaluation services (Story 7.12)
+    builder.Services.AddScoped<RAG.Application.Interfaces.IEvaluationRepository, RAG.Infrastructure.Repositories.EvaluationRepository>();
+    builder.Services.AddScoped<RAG.Application.Interfaces.IEvaluationRunRepository, RAG.Infrastructure.Repositories.EvaluationRunRepository>();
+    builder.Services.AddScoped<RAG.Application.Interfaces.IEvaluationService, RAG.Application.Services.EvaluationService>();
+    builder.Services.AddSingleton<RAG.Evaluation.Plugins.PluginLoaderService>();
+
     // Register User Lookup Service for Keycloak integration
     builder.Services.AddHttpClient<RAG.Application.Interfaces.IUserLookupService, RAG.Infrastructure.Services.KeycloakUserLookupService>();
 

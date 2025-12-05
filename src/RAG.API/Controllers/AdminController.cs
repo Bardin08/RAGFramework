@@ -232,4 +232,73 @@ public class AdminController : ControllerBase
         var result = await auditService.GetLogsAsync(filter, page, pageSize, cancellationToken);
         return Ok(result);
     }
+
+    /// <summary>
+    /// Load a seed dataset for reproducible evaluations.
+    /// </summary>
+    /// <remarks>
+    /// Loads a seed dataset either by name from the data/seeds/ directory or from inline JSON.
+    ///
+    /// This endpoint supports:
+    /// - Loading predefined datasets (dev-seed, test-seed, benchmark)
+    /// - Loading custom datasets via inline JSON
+    /// - Idempotency checks using SHA-256 hash
+    /// - Force reload option to clear existing data
+    ///
+    /// The dataset will be loaded into Elasticsearch, Qdrant, and PostgreSQL for evaluation.
+    /// </remarks>
+    /// <param name="request">Seed data loading request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <response code="200">Dataset loaded successfully</response>
+    /// <response code="400">Invalid request or dataset validation failed</response>
+    /// <response code="401">Unauthorized - authentication required</response>
+    /// <response code="403">Forbidden - admin role required</response>
+    [HttpPost("seed")]
+    [ProducesResponseType(typeof(SeedDataResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<SeedDataResponse>> LoadSeedData(
+        [FromBody] SeedDataRequest request,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation(
+            "Seed data load requested by {User}. Dataset: {DatasetName}, ForceReload: {ForceReload}",
+            User.Identity?.Name,
+            request.DatasetName ?? "inline",
+            request.ForceReload);
+
+        var result = await _adminService.LoadSeedDataAsync(request, cancellationToken);
+
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// List available seed datasets.
+    /// </summary>
+    /// <remarks>
+    /// Returns a list of available seed dataset names from the data/seeds/ directory.
+    /// These datasets can be loaded using the POST /api/admin/seed endpoint.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <response code="200">List of available datasets</response>
+    /// <response code="401">Unauthorized - authentication required</response>
+    /// <response code="403">Forbidden - admin role required</response>
+    [HttpGet("seed/available")]
+    [ProducesResponseType(typeof(AvailableSeedDatasetsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<AvailableSeedDatasetsResponse>> ListAvailableDatasets(
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Available seed datasets requested by {User}", User.Identity?.Name);
+
+        var result = await _adminService.ListAvailableSeedDatasetsAsync(cancellationToken);
+        return Ok(result);
+    }
 }
