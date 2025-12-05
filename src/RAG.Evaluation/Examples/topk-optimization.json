@@ -1,0 +1,45 @@
+{
+  "name": "Top-K Parameter Optimization",
+  "description": "Find optimal number of documents to retrieve",
+  "dataset": "natural-questions",
+  "baseConfiguration": {
+    "retrievalStrategy": "hybrid",
+    "hybridAlpha": 0.7,
+    "hybridBeta": 0.3,
+    "llmTemperature": 0.0
+  },
+  "variants": [
+    {
+      "name": "TopK-5",
+      "parameters": {
+        "topK": 5
+      }
+    },
+    {
+      "name": "TopK-10",
+      "parameters": {
+        "topK": 10
+      }
+    },
+    {
+      "name": "TopK-20",
+      "parameters": {
+        "topK": 20
+      }
+    },
+    {
+      "name": "TopK-50",
+      "parameters": {
+        "topK": 50
+      }
+    }
+  ],
+  "metrics": [
+    "precision@10",
+    "recall@10",
+    "mrr",
+    "f1",
+    "response_time_p95"
+  ],
+  "primaryMetric": "f1"
+}

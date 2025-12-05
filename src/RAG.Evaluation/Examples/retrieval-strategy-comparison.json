@@ -1,0 +1,53 @@
+{
+  "name": "Retrieval Strategy Comparison",
+  "description": "Compare BM25, Dense, Hybrid, and RRF retrieval strategies",
+  "dataset": "natural-questions",
+  "baseConfiguration": {
+    "topK": 10,
+    "llmTemperature": 0.0
+  },
+  "variants": [
+    {
+      "name": "BM25-Only",
+      "parameters": {
+        "retrievalStrategy": "bm25"
+      }
+    },
+    {
+      "name": "Dense-Only",
+      "parameters": {
+        "retrievalStrategy": "dense"
+      }
+    },
+    {
+      "name": "Hybrid-Balanced",
+      "parameters": {
+        "retrievalStrategy": "hybrid",
+        "hybridAlpha": 0.5,
+        "hybridBeta": 0.5
+      }
+    },
+    {
+      "name": "Hybrid-DenseWeighted",
+      "parameters": {
+        "retrievalStrategy": "hybrid",
+        "hybridAlpha": 0.7,
+        "hybridBeta": 0.3
+      }
+    },
+    {
+      "name": "RRF-Default",
+      "parameters": {
+        "retrievalStrategy": "rrf",
+        "rrfK": 60
+      }
+    }
+  ],
+  "metrics": [
+    "precision@10",
+    "recall@10",
+    "mrr",
+    "f1"
+  ],
+  "primaryMetric": "f1"
+}

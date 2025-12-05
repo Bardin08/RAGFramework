@@ -686,6 +686,13 @@ grant_type=password&client_id=rag-api&client_secret=rag-api-secret&username=test
     builder.Services.AddScoped<RAG.Application.Interfaces.IEvaluationService, RAG.Application.Services.EvaluationService>();
     builder.Services.AddSingleton<RAG.Evaluation.Plugins.PluginLoaderService>();
 
+    // Register Benchmark services (Story 7.10)
+    builder.Services.AddSingleton<System.Threading.Channels.Channel<RAG.Core.Domain.BenchmarkJob>>(
+        System.Threading.Channels.Channel.CreateUnbounded<RAG.Core.Domain.BenchmarkJob>());
+    builder.Services.AddScoped<RAG.Application.Interfaces.IBenchmarkService, RAG.Infrastructure.Services.BenchmarkService>();
+    builder.Services.AddScoped<RAG.Evaluation.Services.EvaluationRunner>();
+    builder.Services.AddHostedService<RAG.Infrastructure.BackgroundServices.BenchmarkBackgroundService>();
+
     // Register User Lookup Service for Keycloak integration
     builder.Services.AddHttpClient<RAG.Application.Interfaces.IUserLookupService, RAG.Infrastructure.Services.KeycloakUserLookupService>();
 

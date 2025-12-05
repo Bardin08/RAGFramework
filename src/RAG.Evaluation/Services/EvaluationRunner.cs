@@ -33,7 +33,7 @@ public class EvaluationRunner
     /// <param name="dataset">The evaluation dataset containing samples.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>An evaluation report with all results and statistics.</returns>
-    public async Task<EvaluationReport> RunAsync(
+    public virtual async Task<EvaluationReport> RunAsync(
         EvaluationDataset dataset,
         CancellationToken cancellationToken = default)
     {

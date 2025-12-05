@@ -6,6 +6,10 @@ using RAG.Application.Interfaces;
 using RAG.Core.Authorization;
 using RAG.Core.DTOs.Evaluation;
 using RAG.Core.Exceptions;
+using RAG.Evaluation.Export;
+using RAG.Evaluation.Interfaces;
+using RAG.Evaluation.Models;
+using System.Text.Json;
 
 namespace RAG.API.Controllers;
 
@@ -21,17 +25,22 @@ namespace RAG.API.Controllers;
 public class EvaluationsController : ControllerBase
 {
     private readonly IEvaluationService _evaluationService;
+    private readonly IEvaluationRunRepository _runRepository;
     private readonly ITenantContext _tenantContext;
     private readonly ILogger<EvaluationsController> _logger;
+    private readonly ResultsExporterFactory _exporterFactory;
 
     public EvaluationsController(
         IEvaluationService evaluationService,
+        IEvaluationRunRepository runRepository,
         ITenantContext tenantContext,
         ILogger<EvaluationsController> logger)
     {
         _evaluationService = evaluationService;
+        _runRepository = runRepository;
         _tenantContext = tenantContext;
         _logger = logger;
+        _exporterFactory = new ResultsExporterFactory();
     }
 
     /// <summary>
@@ -278,4 +287,281 @@ public class EvaluationsController : ControllerBase
 
         return Accepted(response);
     }
+
+    /// <summary>
+    /// Export evaluation results in the specified format.
+    /// </summary>
+    /// <param name="runId">The evaluation run ID.</param>
+    /// <param name="format">Export format (csv, json, markdown/md).</param>
+    /// <param name="perQuery">Include per-query breakdown.</param>
+    /// <param name="includePercentiles">Include percentile statistics (P50, P95, P99).</param>
+    /// <param name="includeConfig">Include configuration details.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Results exported successfully</response>
+    /// <response code="400">Invalid format or run not completed</response>
+    /// <response code="401">Unauthorized - authentication required</response>
+    /// <response code="403">Forbidden - admin role required</response>
+    /// <response code="404">Evaluation run not found</response>
+    [HttpGet("runs/{runId:guid}/export")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportResults(
+        Guid runId,
+        [FromQuery] string format = "json",
+        [FromQuery] bool perQuery = false,
+        [FromQuery] bool includePercentiles = true,
+        [FromQuery] bool includeConfig = true,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Exporting results for run {RunId} in {Format} format",
+            runId, format);
+
+        // Validate format
+        if (!_exporterFactory.IsFormatSupported(format))
+        {
+            var supportedFormats = string.Join(", ", _exporterFactory.GetSupportedFormats());
+            return BadRequest(new
+            {
+                error = "invalid_format",
+                message = $"Format '{format}' is not supported. Supported formats: {supportedFormats}"
+            });
+        }
+
+        // Get the run
+        var run = await _runRepository.GetByIdAsync(runId, cancellationToken);
+        if (run == null)
+        {
+            throw new NotFoundException("Evaluation run", runId);
+        }
+
+        // Ensure run is completed
+        if (run.Status != RAG.Core.Domain.EvaluationRunStatus.Completed)
+        {
+            return BadRequest(new
+            {
+                error = "run_not_completed",
+                message = $"Cannot export results for a run with status '{run.Status}'. Only completed runs can be exported.",
+                status = run.Status.ToString()
+            });
+        }
+
+        // Reconstruct EvaluationReport from stored data
+        var report = await ReconstructReportAsync(run, cancellationToken);
+
+        // Export
+        var exporter = _exporterFactory.GetExporter(format);
+        var options = new ExportOptions
+        {
+            IncludePerQueryBreakdown = perQuery,
+            IncludePercentiles = includePercentiles,
+            IncludeConfiguration = includeConfig,
+            DatasetName = run.Name,
+            PrettyPrint = true
+        };
+
+        var data = await exporter.ExportAsync(report, options);
+        var fileName = $"evaluation-{runId.ToString()[..8]}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.{exporter.FileExtension}";
+
+        return File(data, exporter.ContentType, fileName);
+    }
+
+    /// <summary>
+    /// Export comparison of multiple evaluation runs.
+    /// </summary>
+    /// <param name="request">The comparison request with run IDs.</param>
+    /// <param name="format">Export format (csv, json, markdown/md).</param>
+    /// <param name="includePercentiles">Include percentile statistics.</param>
+    /// <param name="includeConfig">Include configuration details.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Comparison exported successfully</response>
+    /// <response code="400">Invalid format or request</response>
+    /// <response code="401">Unauthorized - authentication required</response>
+    /// <response code="403">Forbidden - admin role required</response>
+    /// <response code="404">One or more runs not found</response>
+    [HttpPost("runs/compare/export")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportComparison(
+        [FromBody] CompareRunsRequest request,
+        [FromQuery] string format = "json",
+        [FromQuery] bool includePercentiles = true,
+        [FromQuery] bool includeConfig = true,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Exporting comparison of {Count} runs in {Format} format",
+            request.RunIds.Count, format);
+
+        // Validate
+        if (request.RunIds.Count < 2)
+        {
+            return BadRequest(new
+            {
+                error = "insufficient_runs",
+                message = "At least 2 runs are required for comparison."
+            });
+        }
+
+        if (!_exporterFactory.IsFormatSupported(format))
+        {
+            var supportedFormats = string.Join(", ", _exporterFactory.GetSupportedFormats());
+            return BadRequest(new
+            {
+                error = "invalid_format",
+                message = $"Format '{format}' is not supported. Supported formats: {supportedFormats}"
+            });
+        }
+
+        // Get all runs and reconstruct reports
+        var reports = new List<EvaluationReport>();
+        foreach (var runId in request.RunIds)
+        {
+            var run = await _runRepository.GetByIdAsync(runId, cancellationToken);
+            if (run == null)
+            {
+                throw new NotFoundException("Evaluation run", runId);
+            }
+
+            if (run.Status != RAG.Core.Domain.EvaluationRunStatus.Completed)
+            {
+                return BadRequest(new
+                {
+                    error = "run_not_completed",
+                    message = $"Run {runId} has status '{run.Status}'. Only completed runs can be compared.",
+                    runId = runId,
+                    status = run.Status.ToString()
+                });
+            }
+
+            var report = await ReconstructReportAsync(run, cancellationToken);
+            reports.Add(report);
+        }
+
+        // Export comparison
+        var exporter = _exporterFactory.GetExporter(format);
+        var options = new ExportOptions
+        {
+            IncludePercentiles = includePercentiles,
+            IncludeConfiguration = includeConfig,
+            PrettyPrint = true
+        };
+
+        var data = await exporter.ExportComparisonAsync(reports, options);
+        var fileName = $"evaluation-comparison-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.{exporter.FileExtension}";
+
+        return File(data, exporter.ContentType, fileName);
+    }
+
+    /// <summary>
+    /// Reconstructs an EvaluationReport from a stored EvaluationRun.
+    /// </summary>
+    private async Task<EvaluationReport> ReconstructReportAsync(
+        RAG.Core.Domain.EvaluationRun run,
+        CancellationToken cancellationToken)
+    {
+        // Get metrics
+        var metrics = await _runRepository.GetMetricsForRunAsync(run.Id, cancellationToken);
+
+        // Parse configuration
+        var configuration = new Dictionary<string, object>();
+        if (!string.IsNullOrEmpty(run.Configuration))
+        {
+            try
+            {
+                var configDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(run.Configuration);
+                if (configDict != null)
+                {
+                    foreach (var (key, value) in configDict)
+                    {
+                        configuration[key] = value.ValueKind switch
+                        {
+                            JsonValueKind.String => value.GetString() ?? "",
+                            JsonValueKind.Number => value.GetDouble(),
+                            JsonValueKind.True => true,
+                            JsonValueKind.False => false,
+                            _ => value.ToString()
+                        };
+                    }
+                }
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse configuration for run {RunId}", run.Id);
+            }
+        }
+
+        // Build statistics from metrics
+        var statistics = new Dictionary<string, MetricStatistics>();
+        foreach (var metric in metrics)
+        {
+            // Parse metadata to get full statistics
+            var metadata = ParseMetricMetadata(metric.Metadata);
+
+            statistics[metric.MetricName] = new MetricStatistics(
+                metric.MetricName,
+                (double)metric.MetricValue,
+                metadata.StandardDeviation,
+                metadata.Min,
+                metadata.Max,
+                metadata.SuccessCount,
+                metadata.FailureCount
+            );
+        }
+
+        // Create report
+        return new EvaluationReport
+        {
+            RunId = run.Id,
+            StartedAt = run.StartedAt,
+            CompletedAt = run.FinishedAt ?? DateTimeOffset.UtcNow,
+            SampleCount = run.TotalQueries,
+            Results = [], // We don't store individual results, only aggregated metrics
+            Statistics = statistics,
+            Configuration = configuration
+        };
+    }
+
+    private static (double StandardDeviation, double Min, double Max, int SuccessCount, int FailureCount) ParseMetricMetadata(string? metadata)
+    {
+        if (string.IsNullOrEmpty(metadata))
+        {
+            return (0, 0, 0, 0, 0);
+        }
+
+        try
+        {
+            var doc = JsonDocument.Parse(metadata);
+            var root = doc.RootElement;
+
+            return (
+                root.TryGetProperty("StandardDeviation", out var sd) ? sd.GetDouble() : 0,
+                root.TryGetProperty("Min", out var min) ? min.GetDouble() : 0,
+                root.TryGetProperty("Max", out var max) ? max.GetDouble() : 0,
+                root.TryGetProperty("SuccessCount", out var sc) ? sc.GetInt32() : 0,
+                root.TryGetProperty("FailureCount", out var fc) ? fc.GetInt32() : 0
+            );
+        }
+        catch (JsonException)
+        {
+            return (0, 0, 0, 0, 0);
+        }
+    }
+}
+
+/// <summary>
+/// Request for comparing multiple evaluation runs.
+/// </summary>
+public class CompareRunsRequest
+{
+    /// <summary>
+    /// List of run IDs to compare.
+    /// </summary>
+    public List<Guid> RunIds { get; set; } = new();
 }
