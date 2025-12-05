@@ -44,4 +44,24 @@ public class EvaluationOptions
     /// Timeout for individual metric calculations in seconds.
     /// </summary>
     public int MetricTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Cache duration for ground truth data in minutes.
+    /// </summary>
+    public int GroundTruthCacheMinutes { get; set; } = 5;
+
+    /// <summary>
+    /// K values to use for Precision@K and Recall@K metrics.
+    /// </summary>
+    public List<int> KValues { get; set; } = [5, 10, 20];
+
+    /// <summary>
+    /// Data retention: number of days to keep evaluation runs.
+    /// </summary>
+    public int RetentionDays { get; set; } = 90;
+
+    /// <summary>
+    /// Data retention: maximum number of runs to keep per evaluation.
+    /// </summary>
+    public int? MaxRunsPerEvaluation { get; set; }
 }

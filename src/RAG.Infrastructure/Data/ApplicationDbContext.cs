@@ -55,6 +55,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<IndexRebuildJob> IndexRebuildJobs { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets the EvaluationRuns DbSet for tracking evaluation runs.
+    /// </summary>
+    public DbSet<EvaluationRun> EvaluationRuns { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the EvaluationMetricRecords DbSet for storing metric values.
+    /// </summary>
+    public DbSet<EvaluationMetricRecord> EvaluationMetricRecords { get; set; } = null!;
+
+    /// <summary>
     /// Configures the model for the database.
     /// </summary>
     /// <param name="modelBuilder">The builder being used to construct the model for this context.</param>
@@ -429,6 +439,143 @@ public class ApplicationDbContext : DbContext
 
             entity.HasIndex(e => e.StartedAt)
                 .HasDatabaseName("idx_rebuild_jobs_started_at");
+        });
+
+        modelBuilder.Entity<EvaluationRun>(entity =>
+        {
+            entity.ToTable("evaluation_runs");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.EvaluationId)
+                .HasColumnName("evaluation_id");
+
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(255)
+                .HasColumnName("name");
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description");
+
+            entity.Property(e => e.StartedAt)
+                .IsRequired()
+                .HasColumnName("started_at");
+
+            entity.Property(e => e.FinishedAt)
+                .HasColumnName("finished_at");
+
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasColumnName("status");
+
+            entity.Property(e => e.Progress)
+                .IsRequired()
+                .HasColumnName("progress");
+
+            entity.Property(e => e.Configuration)
+                .IsRequired()
+                .HasColumnType("jsonb")
+                .HasColumnName("configuration");
+
+            entity.Property(e => e.ResultsSummary)
+                .HasColumnType("jsonb")
+                .HasColumnName("results_summary");
+
+            entity.Property(e => e.ErrorMessage)
+                .HasColumnName("error_message");
+
+            entity.Property(e => e.TotalQueries)
+                .IsRequired()
+                .HasColumnName("total_queries");
+
+            entity.Property(e => e.CompletedQueries)
+                .IsRequired()
+                .HasColumnName("completed_queries");
+
+            entity.Property(e => e.FailedQueries)
+                .IsRequired()
+                .HasColumnName("failed_queries");
+
+            entity.Property(e => e.InitiatedBy)
+                .HasMaxLength(255)
+                .HasColumnName("initiated_by");
+
+            entity.Property(e => e.TenantId)
+                .HasMaxLength(100)
+                .HasColumnName("tenant_id");
+
+            // Indexes
+            entity.HasIndex(e => e.EvaluationId)
+                .HasDatabaseName("idx_eval_runs_evaluation");
+
+            entity.HasIndex(e => e.Status)
+                .HasDatabaseName("idx_eval_runs_status");
+
+            entity.HasIndex(e => e.StartedAt)
+                .HasDatabaseName("idx_eval_runs_started_at");
+
+            entity.HasIndex(e => e.TenantId)
+                .HasDatabaseName("idx_eval_runs_tenant");
+        });
+
+        modelBuilder.Entity<EvaluationMetricRecord>(entity =>
+        {
+            entity.ToTable("evaluation_metrics");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.RunId)
+                .IsRequired()
+                .HasColumnName("run_id");
+
+            entity.Property(e => e.MetricName)
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnName("metric_name");
+
+            entity.Property(e => e.MetricValue)
+                .IsRequired()
+                .HasColumnName("metric_value");
+
+            entity.Property(e => e.Metadata)
+                .HasColumnType("jsonb")
+                .HasColumnName("metadata");
+
+            entity.Property(e => e.RecordedAt)
+                .IsRequired()
+                .HasColumnName("recorded_at");
+
+            entity.Property(e => e.SampleId)
+                .HasMaxLength(255)
+                .HasColumnName("sample_id");
+
+            // Foreign key to evaluation runs
+            entity.HasOne(e => e.Run)
+                .WithMany()
+                .HasForeignKey(e => e.RunId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.RunId)
+                .HasDatabaseName("idx_eval_metrics_run");
+
+            entity.HasIndex(e => e.MetricName)
+                .HasDatabaseName("idx_eval_metrics_name");
+
+            entity.HasIndex(e => e.RecordedAt)
+                .HasDatabaseName("idx_eval_metrics_recorded");
+
+            entity.HasIndex(e => new { e.RunId, e.MetricName })
+                .HasDatabaseName("idx_eval_metrics_run_name");
         });
     }
 }
