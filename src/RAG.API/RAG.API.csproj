@@ -40,6 +40,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>config\text-cleaning\%(Filename)%(Extension)</Link>
     </None>
+    <None Include="..\..\prompts\templates\*.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>prompts\templates\%(Filename)%(Extension)</Link>
+    </None>
   </ItemGroup>
 
 </Project>
