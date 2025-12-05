@@ -12,6 +12,36 @@ public record GroundTruthEntry(
     IReadOnlyList<string> RelevantDocumentIds)
 {
     /// <summary>
+    /// Alternative valid answers/aliases (e.g., for TriviaQA).
+    /// If null or empty, only ExpectedAnswer is considered valid.
+    /// </summary>
+    public IReadOnlyList<string>? AnswerAliases { get; init; }
+
+    /// <summary>
+    /// Additional metadata for this entry (e.g., question ID, source).
+    /// </summary>
+    public IReadOnlyDictionary<string, object>? Metadata { get; init; }
+
+    /// <summary>
+    /// Gets all valid answers including the primary answer and aliases.
+    /// </summary>
+    public IEnumerable<string> GetAllValidAnswers()
+    {
+        yield return ExpectedAnswer;
+
+        if (AnswerAliases != null)
+        {
+            foreach (var alias in AnswerAliases)
+            {
+                if (!string.IsNullOrWhiteSpace(alias) && !alias.Equals(ExpectedAnswer, StringComparison.OrdinalIgnoreCase))
+                {
+                    yield return alias;
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Validates that required fields are present.
     /// </summary>
     public bool IsValid() =>

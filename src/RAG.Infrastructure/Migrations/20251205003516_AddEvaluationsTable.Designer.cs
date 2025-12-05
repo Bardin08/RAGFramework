@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RAG.Infrastructure.Data;
@@ -11,9 +12,11 @@ using RAG.Infrastructure.Data;
 namespace RAG.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251205003516_AddEvaluationsTable")]
+    partial class AddEvaluationsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -617,71 +620,6 @@ namespace RAG.Infrastructure.Migrations
                         .HasDatabaseName("idx_rebuild_jobs_tenant");
 
                     b.ToTable("index_rebuild_jobs", (string)null);
-                });
-
-            modelBuilder.Entity("RAG.Core.Domain.SeedDataset", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int>("DocumentsCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("documents_count");
-
-                    b.Property<string>("Hash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("hash");
-
-                    b.Property<DateTime>("LoadedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("loaded_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<Guid>("LoadedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("loaded_by");
-
-                    b.Property<string>("Metadata")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("metadata");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<int>("QueriesCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("queries_count");
-
-                    b.Property<string>("Version")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("version");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Hash")
-                        .HasDatabaseName("idx_seed_datasets_hash");
-
-                    b.HasIndex("LoadedAt")
-                        .HasDatabaseName("idx_seed_datasets_loaded_at");
-
-                    b.HasIndex("LoadedBy")
-                        .HasDatabaseName("idx_seed_datasets_loaded_by");
-
-                    b.HasIndex("Name")
-                        .IsUnique()
-                        .HasDatabaseName("idx_seed_datasets_name_unique");
-
-                    b.ToTable("seed_datasets", (string)null);
                 });
 
             modelBuilder.Entity("RAG.Core.Domain.DocumentAccess", b =>

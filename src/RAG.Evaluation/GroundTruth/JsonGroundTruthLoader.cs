@@ -70,10 +70,24 @@ public class JsonGroundTruthLoader : IGroundTruthLoader
                     continue;
                 }
 
-                entries.Add(new GroundTruthEntry(
+                var entry = new GroundTruthEntry(
                     raw.Query!,
                     raw.ExpectedAnswer ?? string.Empty,
-                    raw.RelevantDocuments ?? []));
+                    raw.RelevantDocuments ?? []);
+
+                // Add answer aliases if present
+                if (raw.AnswerAliases != null && raw.AnswerAliases.Count > 0)
+                {
+                    entry = entry with { AnswerAliases = raw.AnswerAliases };
+                }
+
+                // Add metadata if present
+                if (raw.Metadata != null)
+                {
+                    entry = entry with { Metadata = raw.Metadata };
+                }
+
+                entries.Add(entry);
             }
 
             _logger.LogInformation(
@@ -115,5 +129,7 @@ public class JsonGroundTruthLoader : IGroundTruthLoader
     private record JsonGroundTruthEntry(
         string? Query,
         string? ExpectedAnswer,
-        List<string>? RelevantDocuments);
+        List<string>? RelevantDocuments,
+        List<string>? AnswerAliases = null,
+        Dictionary<string, object>? Metadata = null);
 }

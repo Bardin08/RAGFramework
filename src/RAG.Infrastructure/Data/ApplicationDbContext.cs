@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RAG.Core.Domain;
 using System.Text.Json;
+using EvaluationDomain = RAG.Core.Domain.Evaluation;
 
 namespace RAG.Infrastructure.Data;
 
@@ -63,6 +64,16 @@ public class ApplicationDbContext : DbContext
     /// Gets or sets the EvaluationMetricRecords DbSet for storing metric values.
     /// </summary>
     public DbSet<EvaluationMetricRecord> EvaluationMetricRecords { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the Evaluations DbSet for evaluation configurations.
+    /// </summary>
+    public DbSet<EvaluationDomain> Evaluations { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the SeedDatasets DbSet for tracking loaded seed datasets.
+    /// </summary>
+    public DbSet<SeedDataset> SeedDatasets { get; set; } = null!;
 
     /// <summary>
     /// Configures the model for the database.
@@ -576,6 +587,132 @@ public class ApplicationDbContext : DbContext
 
             entity.HasIndex(e => new { e.RunId, e.MetricName })
                 .HasDatabaseName("idx_eval_metrics_run_name");
+        });
+
+        modelBuilder.Entity<EvaluationDomain>(entity =>
+        {
+            entity.ToTable("evaluations");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnName("name");
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description");
+
+            entity.Property(e => e.Type)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasColumnName("type");
+
+            entity.Property(e => e.Config)
+                .IsRequired()
+                .HasColumnType("jsonb")
+                .HasColumnName("config");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.CreatedBy)
+                .IsRequired()
+                .HasColumnName("created_by");
+
+            entity.Property(e => e.IsActive)
+                .IsRequired()
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnName("updated_at");
+
+            entity.Property(e => e.UpdatedBy)
+                .HasColumnName("updated_by");
+
+            // Unique constraint on name
+            entity.HasIndex(e => e.Name)
+                .IsUnique()
+                .HasDatabaseName("idx_evaluations_name_unique");
+
+            entity.HasIndex(e => e.Type)
+                .HasDatabaseName("idx_evaluations_type");
+
+            entity.HasIndex(e => e.IsActive)
+                .HasDatabaseName("idx_evaluations_active");
+
+            entity.HasIndex(e => e.CreatedAt)
+                .HasDatabaseName("idx_evaluations_created_at");
+        });
+
+        modelBuilder.Entity<SeedDataset>(entity =>
+        {
+            entity.ToTable("seed_datasets");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnName("name");
+
+            entity.Property(e => e.Version)
+                .HasMaxLength(50)
+                .HasColumnName("version");
+
+            entity.Property(e => e.Hash)
+                .IsRequired()
+                .HasMaxLength(64)
+                .HasColumnName("hash");
+
+            entity.Property(e => e.LoadedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("loaded_at");
+
+            entity.Property(e => e.DocumentsCount)
+                .IsRequired()
+                .HasColumnName("documents_count");
+
+            entity.Property(e => e.QueriesCount)
+                .IsRequired()
+                .HasColumnName("queries_count");
+
+            entity.Property(e => e.LoadedBy)
+                .IsRequired()
+                .HasColumnName("loaded_by");
+
+            // Configure Metadata with JSON value converter for compatibility with both PostgreSQL and InMemory
+            var seedMetadataConverter = new ValueConverter<Dictionary<string, object>, string>(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Deserialize<Dictionary<string, object>>(v, (JsonSerializerOptions?)null) ?? new Dictionary<string, object>());
+
+            entity.Property(e => e.Metadata)
+                .HasConversion(seedMetadataConverter)
+                .HasColumnType("jsonb")
+                .HasColumnName("metadata");
+
+            // Unique constraint on name - only one dataset with a given name can be loaded
+            entity.HasIndex(e => e.Name)
+                .IsUnique()
+                .HasDatabaseName("idx_seed_datasets_name_unique");
+
+            entity.HasIndex(e => e.Hash)
+                .HasDatabaseName("idx_seed_datasets_hash");
+
+            entity.HasIndex(e => e.LoadedAt)
+                .HasDatabaseName("idx_seed_datasets_loaded_at");
+
+            entity.HasIndex(e => e.LoadedBy)
+                .HasDatabaseName("idx_seed_datasets_loaded_by");
         });
     }
 }
