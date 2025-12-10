@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RAG.Core.Domain;
 using System.Text.Json;
+using EvaluationDomain = RAG.Core.Domain.Evaluation;
 
 namespace RAG.Infrastructure.Data;
 
@@ -53,6 +54,36 @@ public class ApplicationDbContext : DbContext
     /// Gets or sets the IndexRebuildJobs DbSet for tracking rebuild jobs.
     /// </summary>
     public DbSet<IndexRebuildJob> IndexRebuildJobs { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the EvaluationRuns DbSet for tracking evaluation runs.
+    /// </summary>
+    public DbSet<EvaluationRun> EvaluationRuns { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the EvaluationMetricRecords DbSet for storing metric values.
+    /// </summary>
+    public DbSet<EvaluationMetricRecord> EvaluationMetricRecords { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the Evaluations DbSet for evaluation configurations.
+    /// </summary>
+    public DbSet<EvaluationDomain> Evaluations { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the SeedDatasets DbSet for tracking loaded seed datasets.
+    /// </summary>
+    public DbSet<SeedDataset> SeedDatasets { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the BenchmarkJobs DbSet for tracking benchmark runs.
+    /// </summary>
+    public DbSet<BenchmarkJob> BenchmarkJobs { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the ConfigurationExperimentResults DbSet for A/B testing experiments.
+    /// </summary>
+    public DbSet<ConfigurationExperimentResult> ConfigurationExperimentResults { get; set; } = null!;
 
     /// <summary>
     /// Configures the model for the database.
@@ -429,6 +460,414 @@ public class ApplicationDbContext : DbContext
 
             entity.HasIndex(e => e.StartedAt)
                 .HasDatabaseName("idx_rebuild_jobs_started_at");
+        });
+
+        modelBuilder.Entity<EvaluationRun>(entity =>
+        {
+            entity.ToTable("evaluation_runs");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.EvaluationId)
+                .HasColumnName("evaluation_id");
+
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(255)
+                .HasColumnName("name");
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description");
+
+            entity.Property(e => e.StartedAt)
+                .IsRequired()
+                .HasColumnName("started_at");
+
+            entity.Property(e => e.FinishedAt)
+                .HasColumnName("finished_at");
+
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasColumnName("status");
+
+            entity.Property(e => e.Progress)
+                .IsRequired()
+                .HasColumnName("progress");
+
+            entity.Property(e => e.Configuration)
+                .IsRequired()
+                .HasColumnType("jsonb")
+                .HasColumnName("configuration");
+
+            entity.Property(e => e.ResultsSummary)
+                .HasColumnType("jsonb")
+                .HasColumnName("results_summary");
+
+            entity.Property(e => e.ErrorMessage)
+                .HasColumnName("error_message");
+
+            entity.Property(e => e.TotalQueries)
+                .IsRequired()
+                .HasColumnName("total_queries");
+
+            entity.Property(e => e.CompletedQueries)
+                .IsRequired()
+                .HasColumnName("completed_queries");
+
+            entity.Property(e => e.FailedQueries)
+                .IsRequired()
+                .HasColumnName("failed_queries");
+
+            entity.Property(e => e.InitiatedBy)
+                .HasMaxLength(255)
+                .HasColumnName("initiated_by");
+
+            entity.Property(e => e.TenantId)
+                .HasMaxLength(100)
+                .HasColumnName("tenant_id");
+
+            // Indexes
+            entity.HasIndex(e => e.EvaluationId)
+                .HasDatabaseName("idx_eval_runs_evaluation");
+
+            entity.HasIndex(e => e.Status)
+                .HasDatabaseName("idx_eval_runs_status");
+
+            entity.HasIndex(e => e.StartedAt)
+                .HasDatabaseName("idx_eval_runs_started_at");
+
+            entity.HasIndex(e => e.TenantId)
+                .HasDatabaseName("idx_eval_runs_tenant");
+        });
+
+        modelBuilder.Entity<EvaluationMetricRecord>(entity =>
+        {
+            entity.ToTable("evaluation_metrics");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.RunId)
+                .IsRequired()
+                .HasColumnName("run_id");
+
+            entity.Property(e => e.MetricName)
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnName("metric_name");
+
+            entity.Property(e => e.MetricValue)
+                .IsRequired()
+                .HasColumnName("metric_value");
+
+            entity.Property(e => e.Metadata)
+                .HasColumnType("jsonb")
+                .HasColumnName("metadata");
+
+            entity.Property(e => e.RecordedAt)
+                .IsRequired()
+                .HasColumnName("recorded_at");
+
+            entity.Property(e => e.SampleId)
+                .HasMaxLength(255)
+                .HasColumnName("sample_id");
+
+            // Foreign key to evaluation runs
+            entity.HasOne(e => e.Run)
+                .WithMany()
+                .HasForeignKey(e => e.RunId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes
+            entity.HasIndex(e => e.RunId)
+                .HasDatabaseName("idx_eval_metrics_run");
+
+            entity.HasIndex(e => e.MetricName)
+                .HasDatabaseName("idx_eval_metrics_name");
+
+            entity.HasIndex(e => e.RecordedAt)
+                .HasDatabaseName("idx_eval_metrics_recorded");
+
+            entity.HasIndex(e => new { e.RunId, e.MetricName })
+                .HasDatabaseName("idx_eval_metrics_run_name");
+        });
+
+        modelBuilder.Entity<EvaluationDomain>(entity =>
+        {
+            entity.ToTable("evaluations");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnName("name");
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description");
+
+            entity.Property(e => e.Type)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasColumnName("type");
+
+            entity.Property(e => e.Config)
+                .IsRequired()
+                .HasColumnType("jsonb")
+                .HasColumnName("config");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.CreatedBy)
+                .IsRequired()
+                .HasColumnName("created_by");
+
+            entity.Property(e => e.IsActive)
+                .IsRequired()
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnName("updated_at");
+
+            entity.Property(e => e.UpdatedBy)
+                .HasColumnName("updated_by");
+
+            // Unique constraint on name
+            entity.HasIndex(e => e.Name)
+                .IsUnique()
+                .HasDatabaseName("idx_evaluations_name_unique");
+
+            entity.HasIndex(e => e.Type)
+                .HasDatabaseName("idx_evaluations_type");
+
+            entity.HasIndex(e => e.IsActive)
+                .HasDatabaseName("idx_evaluations_active");
+
+            entity.HasIndex(e => e.CreatedAt)
+                .HasDatabaseName("idx_evaluations_created_at");
+        });
+
+        modelBuilder.Entity<SeedDataset>(entity =>
+        {
+            entity.ToTable("seed_datasets");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnName("name");
+
+            entity.Property(e => e.Version)
+                .HasMaxLength(50)
+                .HasColumnName("version");
+
+            entity.Property(e => e.Hash)
+                .IsRequired()
+                .HasMaxLength(64)
+                .HasColumnName("hash");
+
+            entity.Property(e => e.LoadedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("loaded_at");
+
+            entity.Property(e => e.DocumentsCount)
+                .IsRequired()
+                .HasColumnName("documents_count");
+
+            entity.Property(e => e.QueriesCount)
+                .IsRequired()
+                .HasColumnName("queries_count");
+
+            entity.Property(e => e.LoadedBy)
+                .IsRequired()
+                .HasColumnName("loaded_by");
+
+            // Configure Metadata with JSON value converter for compatibility with both PostgreSQL and InMemory
+            var seedMetadataConverter = new ValueConverter<Dictionary<string, object>, string>(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Deserialize<Dictionary<string, object>>(v, (JsonSerializerOptions?)null) ?? new Dictionary<string, object>());
+
+            entity.Property(e => e.Metadata)
+                .HasConversion(seedMetadataConverter)
+                .HasColumnType("jsonb")
+                .HasColumnName("metadata");
+
+            // Unique constraint on name - only one dataset with a given name can be loaded
+            entity.HasIndex(e => e.Name)
+                .IsUnique()
+                .HasDatabaseName("idx_seed_datasets_name_unique");
+
+            entity.HasIndex(e => e.Hash)
+                .HasDatabaseName("idx_seed_datasets_hash");
+
+            entity.HasIndex(e => e.LoadedAt)
+                .HasDatabaseName("idx_seed_datasets_loaded_at");
+
+            entity.HasIndex(e => e.LoadedBy)
+                .HasDatabaseName("idx_seed_datasets_loaded_by");
+        });
+
+        modelBuilder.Entity<BenchmarkJob>(entity =>
+        {
+            entity.ToTable("benchmark_jobs");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasColumnName("status");
+
+            entity.Property(e => e.Dataset)
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnName("dataset");
+
+            entity.Property(e => e.Configuration)
+                .IsRequired()
+                .HasColumnType("jsonb")
+                .HasColumnName("configuration");
+
+            entity.Property(e => e.SampleSize)
+                .HasColumnName("sample_size");
+
+            entity.Property(e => e.Results)
+                .HasColumnType("jsonb")
+                .HasColumnName("results");
+
+            entity.Property(e => e.Progress)
+                .IsRequired()
+                .HasColumnName("progress");
+
+            entity.Property(e => e.TotalSamples)
+                .HasColumnName("total_samples");
+
+            entity.Property(e => e.ProcessedSamples)
+                .HasColumnName("processed_samples");
+
+            entity.Property(e => e.ErrorMessage)
+                .HasColumnName("error_message");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.StartedAt)
+                .HasColumnName("started_at");
+
+            entity.Property(e => e.CompletedAt)
+                .HasColumnName("completed_at");
+
+            entity.Property(e => e.InitiatedBy)
+                .HasMaxLength(255)
+                .HasColumnName("initiated_by");
+
+            // Indexes
+            entity.HasIndex(e => e.Status)
+                .HasDatabaseName("idx_benchmark_jobs_status");
+
+            entity.HasIndex(e => e.Dataset)
+                .HasDatabaseName("idx_benchmark_jobs_dataset");
+
+            entity.HasIndex(e => e.CreatedAt)
+                .HasDatabaseName("idx_benchmark_jobs_created_at");
+
+            entity.HasIndex(e => e.InitiatedBy)
+                .HasDatabaseName("idx_benchmark_jobs_initiated_by");
+        });
+
+        modelBuilder.Entity<ConfigurationExperimentResult>(entity =>
+        {
+            entity.ToTable("configuration_experiment_results");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.ExperimentName)
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnName("experiment_name");
+
+            entity.Property(e => e.VariantName)
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnName("variant_name");
+
+            entity.Property(e => e.Configuration)
+                .IsRequired()
+                .HasColumnType("jsonb")
+                .HasColumnName("configuration");
+
+            entity.Property(e => e.Metrics)
+                .IsRequired()
+                .HasColumnType("jsonb")
+                .HasColumnName("metrics");
+
+            entity.Property(e => e.CompositeScore)
+                .IsRequired()
+                .HasColumnName("composite_score");
+
+            entity.Property(e => e.IsWinner)
+                .IsRequired()
+                .HasDefaultValue(false)
+                .HasColumnName("is_winner");
+
+            entity.Property(e => e.StatisticalSignificance)
+                .HasColumnType("jsonb")
+                .HasColumnName("statistical_significance");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.CompletedAt)
+                .IsRequired()
+                .HasColumnName("completed_at");
+
+            entity.Property(e => e.InitiatedBy)
+                .HasColumnName("initiated_by");
+
+            entity.Property(e => e.TenantId)
+                .HasColumnName("tenant_id");
+
+            // Indexes
+            entity.HasIndex(e => e.ExperimentName)
+                .HasDatabaseName("idx_config_exp_name");
+
+            entity.HasIndex(e => new { e.ExperimentName, e.VariantName })
+                .HasDatabaseName("idx_config_exp_name_variant");
+
+            entity.HasIndex(e => e.CreatedAt)
+                .HasDatabaseName("idx_config_exp_created_at");
+
+            entity.HasIndex(e => e.TenantId)
+                .HasDatabaseName("idx_config_exp_tenant");
+
+            entity.HasIndex(e => e.IsWinner)
+                .HasDatabaseName("idx_config_exp_winner");
         });
     }
 }

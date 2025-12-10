@@ -137,6 +137,88 @@ namespace RAG.Infrastructure.Migrations
                     b.ToTable("audit_logs", (string)null);
                 });
 
+            modelBuilder.Entity("RAG.Core.Domain.BenchmarkJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<string>("Configuration")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("configuration");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Dataset")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("dataset");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<string>("InitiatedBy")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("initiated_by");
+
+                    b.Property<int?>("ProcessedSamples")
+                        .HasColumnType("integer")
+                        .HasColumnName("processed_samples");
+
+                    b.Property<int>("Progress")
+                        .HasColumnType("integer")
+                        .HasColumnName("progress");
+
+                    b.Property<string>("Results")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("results");
+
+                    b.Property<int?>("SampleSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("sample_size");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<int?>("TotalSamples")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_samples");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("idx_benchmark_jobs_created_at");
+
+                    b.HasIndex("Dataset")
+                        .HasDatabaseName("idx_benchmark_jobs_dataset");
+
+                    b.HasIndex("InitiatedBy")
+                        .HasDatabaseName("idx_benchmark_jobs_initiated_by");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("idx_benchmark_jobs_status");
+
+                    b.ToTable("benchmark_jobs", (string)null);
+                });
+
             modelBuilder.Entity("RAG.Core.Domain.Document", b =>
                 {
                     b.Property<Guid>("Id")
@@ -350,6 +432,216 @@ namespace RAG.Infrastructure.Migrations
                     b.ToTable("document_hashes", (string)null);
                 });
 
+            modelBuilder.Entity("RAG.Core.Domain.Evaluation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Config")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("config");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("idx_evaluations_created_at");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("idx_evaluations_active");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("idx_evaluations_name_unique");
+
+                    b.HasIndex("Type")
+                        .HasDatabaseName("idx_evaluations_type");
+
+                    b.ToTable("evaluations", (string)null);
+                });
+
+            modelBuilder.Entity("RAG.Core.Domain.EvaluationMetricRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<string>("MetricName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("metric_name");
+
+                    b.Property<decimal>("MetricValue")
+                        .HasColumnType("numeric")
+                        .HasColumnName("metric_value");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<string>("SampleId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("sample_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MetricName")
+                        .HasDatabaseName("idx_eval_metrics_name");
+
+                    b.HasIndex("RecordedAt")
+                        .HasDatabaseName("idx_eval_metrics_recorded");
+
+                    b.HasIndex("RunId")
+                        .HasDatabaseName("idx_eval_metrics_run");
+
+                    b.HasIndex("RunId", "MetricName")
+                        .HasDatabaseName("idx_eval_metrics_run_name");
+
+                    b.ToTable("evaluation_metrics", (string)null);
+                });
+
+            modelBuilder.Entity("RAG.Core.Domain.EvaluationRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CompletedQueries")
+                        .HasColumnType("integer")
+                        .HasColumnName("completed_queries");
+
+                    b.Property<string>("Configuration")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("configuration");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<Guid?>("EvaluationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evaluation_id");
+
+                    b.Property<int>("FailedQueries")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_queries");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("InitiatedBy")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("initiated_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Progress")
+                        .HasColumnType("integer")
+                        .HasColumnName("progress");
+
+                    b.Property<string>("ResultsSummary")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("results_summary");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TenantId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TotalQueries")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_queries");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EvaluationId")
+                        .HasDatabaseName("idx_eval_runs_evaluation");
+
+                    b.HasIndex("StartedAt")
+                        .HasDatabaseName("idx_eval_runs_started_at");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("idx_eval_runs_status");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("idx_eval_runs_tenant");
+
+                    b.ToTable("evaluation_runs", (string)null);
+                });
+
             modelBuilder.Entity("RAG.Core.Domain.IndexRebuildJob", b =>
                 {
                     b.Property<Guid>("JobId")
@@ -409,6 +701,71 @@ namespace RAG.Infrastructure.Migrations
                     b.ToTable("index_rebuild_jobs", (string)null);
                 });
 
+            modelBuilder.Entity("RAG.Core.Domain.SeedDataset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("DocumentsCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("documents_count");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("hash");
+
+                    b.Property<DateTime>("LoadedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("loaded_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("LoadedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("loaded_by");
+
+                    b.Property<string>("Metadata")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("QueriesCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("queries_count");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Hash")
+                        .HasDatabaseName("idx_seed_datasets_hash");
+
+                    b.HasIndex("LoadedAt")
+                        .HasDatabaseName("idx_seed_datasets_loaded_at");
+
+                    b.HasIndex("LoadedBy")
+                        .HasDatabaseName("idx_seed_datasets_loaded_by");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("idx_seed_datasets_name_unique");
+
+                    b.ToTable("seed_datasets", (string)null);
+                });
+
             modelBuilder.Entity("RAG.Core.Domain.DocumentAccess", b =>
                 {
                     b.HasOne("RAG.Core.Domain.Document", null)
@@ -416,6 +773,17 @@ namespace RAG.Infrastructure.Migrations
                         .HasForeignKey("DocumentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("RAG.Core.Domain.EvaluationMetricRecord", b =>
+                {
+                    b.HasOne("RAG.Core.Domain.EvaluationRun", "Run")
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Run");
                 });
 #pragma warning restore 612, 618
         }

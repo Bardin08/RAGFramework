@@ -24,6 +24,7 @@ public class AdminService : IAdminService
     private readonly ILogger<AdminService> _logger;
     private readonly Channel<IndexRebuildJob> _jobQueue;
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _cancellationTokens;
+    private readonly RAG.Evaluation.Interfaces.ISeedDataLoader? _seedDataLoader;
 
     private static readonly DateTime _startTime = DateTime.UtcNow;
 
@@ -32,7 +33,8 @@ public class AdminService : IAdminService
         IHealthCheckService healthCheckService,
         IMemoryCache memoryCache,
         ILogger<AdminService> logger,
-        Channel<IndexRebuildJob> jobQueue)
+        Channel<IndexRebuildJob> jobQueue,
+        RAG.Evaluation.Interfaces.ISeedDataLoader? seedDataLoader = null)
     {
         _dbContext = dbContext;
         _healthCheckService = healthCheckService;
@@ -40,6 +42,7 @@ public class AdminService : IAdminService
         _logger = logger;
         _jobQueue = jobQueue;
         _cancellationTokens = new ConcurrentDictionary<Guid, CancellationTokenSource>();
+        _seedDataLoader = seedDataLoader;
     }
 
     /// <inheritdoc/>
@@ -293,5 +296,104 @@ public class AdminService : IAdminService
             EntriesRemoved = entriesRemoved,
             ClearedAt = DateTime.UtcNow
         });
+    }
+
+    /// <inheritdoc/>
+    public async Task<SeedDataResponse> LoadSeedDataAsync(
+        SeedDataRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        // Validate request
+        var (isValid, error) = request.Validate();
+        if (!isValid)
+        {
+            return new SeedDataResponse
+            {
+                Success = false,
+                DatasetName = request.DatasetName ?? "unknown",
+                Error = error
+            };
+        }
+
+        // Check if seed data loader is available
+        if (_seedDataLoader == null)
+        {
+            _logger.LogError("SeedDataLoader service is not registered");
+            return new SeedDataResponse
+            {
+                Success = false,
+                DatasetName = request.DatasetName ?? "unknown",
+                Error = "Seed data loading is not available. ISeedDataLoader service is not registered."
+            };
+        }
+
+        // Determine tenant ID
+        var tenantId = request.TenantId ?? Guid.Parse("00000000-0000-0000-0000-000000000001"); // Default evaluation tenant
+
+        // Get current user ID (this should come from the request context)
+        // For now, we'll use a system user ID
+        var loadedBy = Guid.Parse("00000000-0000-0000-0000-000000000000");
+
+        RAG.Evaluation.Interfaces.SeedDataLoadResult result;
+
+        // Load dataset
+        if (!string.IsNullOrWhiteSpace(request.DatasetName))
+        {
+            _logger.LogInformation("Loading seed dataset by name: {DatasetName}", request.DatasetName);
+            result = await _seedDataLoader.LoadDatasetByNameAsync(
+                request.DatasetName,
+                loadedBy,
+                tenantId,
+                request.ForceReload,
+                cancellationToken);
+        }
+        else
+        {
+            _logger.LogInformation("Loading seed dataset from inline JSON");
+            result = await _seedDataLoader.LoadDatasetFromJsonAsync(
+                request.DatasetJson!,
+                loadedBy,
+                tenantId,
+                request.ForceReload,
+                cancellationToken);
+        }
+
+        // Convert to response
+        return new SeedDataResponse
+        {
+            Success = result.Success,
+            DatasetName = result.DatasetName,
+            DocumentsLoaded = result.DocumentsLoaded,
+            QueriesCount = result.QueriesCount,
+            WasAlreadyLoaded = result.WasAlreadyLoaded,
+            Hash = result.Hash,
+            Error = result.Error,
+            ValidationErrors = result.ValidationErrors,
+            DurationMs = result.Duration?.TotalMilliseconds,
+            LoadedAt = DateTime.UtcNow,
+            LoadedBy = loadedBy,
+            Metadata = result.Metadata
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<AvailableSeedDatasetsResponse> ListAvailableSeedDatasetsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_seedDataLoader == null)
+        {
+            _logger.LogError("SeedDataLoader service is not registered");
+            return new AvailableSeedDatasetsResponse
+            {
+                Datasets = new List<string>()
+            };
+        }
+
+        var datasets = await _seedDataLoader.ListAvailableDatasetsAsync(cancellationToken);
+
+        return new AvailableSeedDatasetsResponse
+        {
+            Datasets = datasets
+        };
     }
 }
